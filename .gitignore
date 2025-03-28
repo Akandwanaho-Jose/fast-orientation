@@ -1,0 +1,38 @@
+# Flutter/Dart specific
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+flutter_*.snapshot
+
+# Ignore generated files
+*.g.dart
+*.freezed.dart
+
+# Ignore sensitive files
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_export_environment.sh
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Ignore local configuration files
+*.iml
+.idea/
+.vscode/
+
+# Ignore environment files (if you have any)
+.env
+*.env
+
+# Ignore macOS-specific files
+.DS_Store
+
+# Ignore build artifacts and dependencies
+android/.gradle/
+android/app/build/
+ios/.build/

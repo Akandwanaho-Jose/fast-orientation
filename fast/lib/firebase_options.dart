@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'fast-must-orientation.firebasestorage.app',
     measurementId: 'G-TT42Y1KZ42',
   );
+
 }

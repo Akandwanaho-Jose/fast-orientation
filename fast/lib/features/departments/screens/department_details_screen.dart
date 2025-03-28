@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:fast/core/utils/constants.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fast/features/departments/models/department.dart';
-import 'package:fast/features/departments/screens/course_details_screen.dart'; // Add this import
+import 'package:fast/features/departments/models/program.dart';
+import 'package:fast/features/departments/models/course.dart';
+import 'package:fast/features/departments/screens/course_details_screen.dart';
 
 class DepartmentDetailsScreen extends StatelessWidget {
   final Department department;
@@ -11,167 +13,93 @@ class DepartmentDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          department.name,
-          style: const TextStyle(color: Colors.white),
-        ),
-        backgroundColor: mustBlue,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          // Department Image
-          if (department.imageUrl.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
-              child: Image.asset(
-                department.imageUrl,
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (context, error, stackTrace) => Container(
-                      height: 200,
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.image,
-                        size: 50,
-                        color: Colors.grey,
-                      ),
-                    ),
-              ),
-            ),
-          const SizedBox(height: 16),
+      appBar: AppBar(title: Text(department.name)),
+      body: FutureBuilder<QuerySnapshot>(
+        future:
+            FirebaseFirestore.instance
+                .collection('departments')
+                .doc(department.id)
+                .collection('programs')
+                .get(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const Center(child: Text('Error loading programs'));
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          // Department Description
-          Text(
-            'About the Department',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: mustGreen,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            department.description,
-            style: const TextStyle(fontSize: 16, color: Colors.black87),
-          ),
-          const SizedBox(height: 16),
+          final programs =
+              snapshot.data!.docs.map((doc) {
+                return Program.fromJson(
+                  doc.data() as Map<String, dynamic>,
+                  [], // YearCourses are fetched separately
+                );
+              }).toList();
 
-          // Programs (if any)
-          Text(
-            'Programs',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: mustGreen,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (department.programs.isNotEmpty)
-            ...department.programs.map((program) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Program Header
-                  Card(
-                    elevation: 2,
-                    margin: const EdgeInsets.only(bottom: 8.0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            program.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: mustBlue,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${program.durationYears} Years',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Courses by Year
-                  ...program.yearCourses.map((yearCourses) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(
-                            'Year ${yearCourses.year}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: mustBlue,
-                            ),
-                          ),
-                        ),
-                        ...yearCourses.courses.map((course) {
-                          return Card(
-                            elevation: 1,
-                            margin: const EdgeInsets.only(
-                              bottom: 8.0,
-                              left: 16.0,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: ListTile(
-                              title: Text(
-                                course.name,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              subtitle: Text(
-                                'Code: ${course.code} | Credits: ${course.credits}',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              trailing: const Icon(
-                                Icons.arrow_forward,
-                                color: mustGreen,
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) =>
-                                            CourseDetailsScreen(course: course),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    );
-                  }).toList(),
-                  const SizedBox(height: 16),
-                ],
+          return ListView.builder(
+            itemCount: programs.length,
+            itemBuilder: (context, index) {
+              final program = programs[index];
+              return ExpansionTile(
+                title: Text(program.name),
+                subtitle: Text('Duration: ${program.durationYears} years'),
+                children: List.generate(4, (yearIndex) {
+                  final year = yearIndex + 1;
+                  return FutureBuilder<DocumentSnapshot>(
+                    future:
+                        FirebaseFirestore.instance
+                            .collection('departments')
+                            .doc(department.id)
+                            .collection('programs')
+                            .doc(snapshot.data!.docs[index].id)
+                            .collection('yearCourses')
+                            .doc('year$year')
+                            .get(),
+                    builder: (context, yearSnapshot) {
+                      if (yearSnapshot.hasError) {
+                        return const ListTile(
+                          title: Text('Error loading courses'),
+                        );
+                      }
+                      if (!yearSnapshot.hasData || !yearSnapshot.data!.exists) {
+                        return const ListTile(
+                          title: Text('No courses available'),
+                        );
+                      }
+
+                      final yearCourses = YearCourses.fromJson(
+                        yearSnapshot.data!.data() as Map<String, dynamic>,
+                      );
+
+                      return ExpansionTile(
+                        title: Text('Year $year'),
+                        children:
+                            yearCourses.courses.map((course) {
+                              return ListTile(
+                                title: Text(course.name),
+                                subtitle: Text('Credits: ${course.credits}'),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => CourseDetailsScreen(
+                                            course: course,
+                                          ),
+                                    ),
+                                  );
+                                },
+                              );
+                            }).toList(),
+                      );
+                    },
+                  );
+                }),
               );
-            }).toList()
-          else
-            const Text(
-              'No programs available for this department.',
-              style: TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-        ],
+            },
+          );
+        },
       ),
     );
   }

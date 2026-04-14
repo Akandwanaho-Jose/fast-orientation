@@ -1,4 +1,4 @@
-package com.example.fast
+package com.akandwanaho.fast
 
 import io.flutter.embedding.android.FlutterActivity
 

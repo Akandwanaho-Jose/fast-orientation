@@ -1,0 +1,30 @@
+{
+  "faculty_info": {
+    "faculty_values": {
+      "0": {
+        "title": "Excellence",
+        "description": "Commitment to the highest standards in teaching, research, and service delivery"
+      },
+      "1": {
+        "title": "Innovation",
+        "description": "Embracing creativity and new ideas to solve complex technological challenges"
+      },
+      "2": {
+        "title": "Integrity",
+        "description": "Upholding honesty, transparency, and ethical conduct in all academic activities"
+      },
+      "3": {
+        "title": "Collaboration",
+        "description": "Working together with industry, community, and international partners to achieve common goals"
+      },
+      "4": {
+        "title": "Sustainability",
+        "description": "Promoting practices that ensure long-term environmental and social well-being"
+      },
+      "5": {
+        "title": "Diversity",
+        "description": "Celebrating and fostering an inclusive environment that values different perspectives"
+      }
+    }
+  }
+}

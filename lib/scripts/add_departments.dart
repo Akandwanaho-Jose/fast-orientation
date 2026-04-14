@@ -1,17 +1,17 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+/*import 'package:cloud_firestore/cloud_firestore.dart';
 
-class AddDepartmentsScript {
-  static Future<void> addDepartments() async {
-    final firestore = FirebaseFirestore.instance;
+//class AddDepartmentsScript {
+  //static Future<void> addDepartments() async {
+   // final firestore = FirebaseFirestore.instance;
 
     // Department of Mechanical Engineering (ID: 5)
-    await firestore.collection('departments').doc('5').set({
-      'description':
-          'The Department of Mechanical Engineering focuses on the design, analysis, and manufacturing of mechanical systems, preparing students for innovative careers in engineering.',
-      'id': '5',
-      'imageUrl': 'assets/images/mechanical.jpg',
-      'name': 'Mechanical Engineering',
-    });
+    //await firestore.collection('departments').doc('5').set({
+     // 'description':
+       //   'The Department of Mechanical Engineering focuses on the design, analysis, and manufacturing of mechanical systems, preparing students for innovative careers in engineering.',
+      //'id': '5',
+      //'imageUrl': 'assets/images/mechanical.jpg',
+      //'name': 'Mechanical Engineering',
+    })//;
 
     // Add programs subcollection for Mechanical Engineering
     await firestore
@@ -244,4 +244,4 @@ class AddDepartmentsScript {
       'Successfully added Mechanical Engineering and Biomedical Engineering departments!',
     );
   }
-}
+}*/

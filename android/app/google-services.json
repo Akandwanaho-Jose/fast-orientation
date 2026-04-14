@@ -1,10 +1,30 @@
 {
   "project_info": {
     "project_number": "337248832832",
+    "firebase_url": "https://fast-must-orientation-default-rtdb.firebaseio.com",
     "project_id": "fast-must-orientation",
     "storage_bucket": "fast-must-orientation.firebasestorage.app"
   },
   "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:337248832832:android:30982fec0104661225bea5",
+        "android_client_info": {
+          "package_name": "com.akandwanaho.fast"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfl4ambn6HZapmL5VTOMh826OwakICXFY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
     {
       "client_info": {
         "mobilesdk_app_id": "1:337248832832:android:81a54e1093847f6325bea5",

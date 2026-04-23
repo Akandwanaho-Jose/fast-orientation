@@ -1,25 +1,17 @@
 import 'package:flutter/material.dart';
+import 'core/theme/fast_brand.dart';
 import 'features/home/screens/home_screen.dart';
 import 'core/utils/constants.dart'; // Import Constants
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MUST FAST Orientation',
-      theme: ThemeData(
-        primaryColor: mustBlue, // Use constant from constants.dart
-        scaffoldBackgroundColor: Colors.white,
-        textTheme: const TextTheme(
-          headlineSmall: TextStyle(
-            color: mustBlue,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-          bodyMedium: TextStyle(color: Colors.black87),
-        ),
+      title: FastBrand.appTitle,
+      theme: FastBrand.theme().copyWith(
+        primaryColor: mustBlue,
       ),
       home: const HomeScreen(),
     );

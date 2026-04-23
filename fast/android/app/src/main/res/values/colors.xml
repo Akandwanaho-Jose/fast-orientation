@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification color - matches your mustBlue -->
+    <color name="notification_color">#1976D2</color>
+    
+    <!-- Other colors for your app -->
+    <color name="colorPrimary">#1976D2</color>
+    <color name="colorPrimaryDark">#1565C0</color>
+    <color name="colorAccent">#4CAF50</color>
+</resources>

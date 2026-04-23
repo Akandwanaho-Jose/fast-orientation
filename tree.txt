@@ -1,0 +1,58 @@
+fast_must_orientation/
+├── lib/
+│   ├── main.dart
+│   ├── app.dart
+│   ├── core/
+│   │   ├── widgets/
+│   │   │   ├── centered_progress_indicator.dart  //  Reusable Loading Indicator
+│   │   ├── services/
+│   │   │   ├── api_service.dart         //  Placeholder for API Service (future)
+│   │   ├── utils/
+│   │   │   ├── constants.dart          //  Color Constants, etc.
+│   ├── features/
+│   │   ├── home/
+│   │   │   ├── screens/
+│   │   │   │   ├── home_screen.dart       //  Home Screen
+│   │   │   ├── widgets/
+│   │   │   │   ├── home_feature_card.dart //  Reusable Feature Card
+│   │   │   ├── models/
+│   │   │   ├── bloc/
+│   │   ├── courses/
+│   │   │   ├── screens/
+│   │   │   │   ├── courses_screen.dart    //  Courses List Screen (Placeholder)
+│   │   │   ├── widgets/
+│   │   │   ├── models/
+│   │   │   ├── bloc/
+│   │   ├── faculty/
+│   │   │   ├── screens/
+│   │   │   │   ├── faculty_screen.dart   //  Faculty List Screen (Placeholder)
+│   │   │   ├── widgets/
+│   │   │   ├── models/
+│   │   │   ├── bloc/
+│   │   ├── announcements/
+│   │   │   ├── screens/
+│   │   │   │   ├── announcements_screen.dart // Announcements Screen(placeholder)
+│   │   │   ├── widgets/
+│   │   │   ├── models/
+│   │   │   ├── bloc/
+│   │   ├── faq/
+│   │   │   ├── screens/
+│   │   │   │   ├── faq_screen.dart       //  FAQ Screen (Placeholder)
+│   │   │   ├── widgets/
+│   │   │   ├── models/
+│   │   │   ├── bloc/
+│   │   ├── chatbot/
+│   │   │   ├── screens/
+│   │   │   │   ├── chatbot_screen.dart    //  Chatbot Screen (Placeholder)
+│   │   │   ├── widgets/
+│   │   │   ├── models/
+│   │   │   ├── bloc/
+│   │   ├── departments/
+│   │   │   ├── screens/
+│   │   │   │   ├── departments_screen.dart //  Department List Screen
+│   │   │   │   ├── department_details_screen.dart // Department Detail Screen Placeholder
+│   │   │   ├── widgets/
+│   │   │   ├── models/
+│   │   │   │   ├── department.dart       //  Department Data Model
+│   ├── models/         // Global data models
+│   ├── widgets/        // Global widgets applicable throughout the app

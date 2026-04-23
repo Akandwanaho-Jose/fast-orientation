@@ -1,0 +1,48 @@
+{
+  "name": "canva-graphics",
+  "version": "0.1.0",
+  "description": "[TODO: Brief plugin description]",
+  "author": {
+    "name": "[TODO: Author Name]",
+    "email": "[TODO: author@example.com]",
+    "url": "[TODO: https://example.com]"
+  },
+  "homepage": "[TODO: https://example.com/docs]",
+  "repository": "[TODO: https://example.com/repo]",
+  "license": "MIT",
+  "keywords": [
+    "canva",
+    "graphics",
+    "branding",
+    "flutter",
+    "assets"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Canva Graphics",
+    "shortDescription": "Canva export workflow for FAST app graphics",
+    "longDescription": "Use this plugin to standardize Canva exports for quick links, homepage hero graphics, and other portable app visuals. This scaffold does not yet include live Canva API integration.",
+    "developerName": "[TODO: Developer Name]",
+    "category": "Design",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "[TODO: https://example.com]",
+    "privacyPolicyURL": "[TODO: https://example.com/privacy]",
+    "termsOfServiceURL": "[TODO: https://example.com/terms]",
+    "defaultPrompt": [
+      "Help me export Canva quick link icons for this app.",
+      "Prepare a FAST homepage hero image workflow.",
+      "Tell me where each Canva asset should go in the project."
+    ],
+    "brandColor": "#00579B",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png",
+    "screenshots": [
+      "./assets/screenshot1.png",
+      "./assets/screenshot2.png",
+      "./assets/screenshot3.png"
+    ]
+  }
+}

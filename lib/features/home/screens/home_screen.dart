@@ -1,18 +1,19 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fast/core/services/auth_service.dart';
-import 'package:fast/core/services/lib/core/services/department_service.dart';
-import 'package:fast/core/services/lib/core/services/program_service.dart';
-import 'package:fast/core/services/lib/core/services/staff_service.dart';
-import 'package:fast/core/services/lib/core/services/faculty_info_service.dart';
+import 'package:fast/core/theme/fast_brand.dart';
 import 'package:fast/core/utils/constants.dart';
+import 'package:fast/core/widgets/safe_network_avatar.dart';
+import 'package:fast/core/widgets/safe_remote_image.dart';
+import 'package:fast/features/annoucements/models/announcement.dart';
+import 'package:fast/features/annoucements/screens/annoucement_details_screen.dart';
 import 'package:fast/features/auth/screens/login_screen.dart';
-import 'package:fast/features/annoucements/screens/announcements_screen.dart';
-import 'package:fast/features/departments/screens/departments_screen.dart';
+import 'package:fast/features/explore/screens/explore_fast_screen.dart';
+import 'package:fast/features/more/screens/more_screen.dart';
+import 'package:fast/features/people/screens/people_screen.dart';
 import 'package:fast/features/quick_links/widgets/quick_links_grid.dart';
-import 'package:fast/features/staff/screens/staff_sreen.dart';
+import 'package:fast/features/updates/screens/updates_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
-import 'package:logging/logging.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,113 +22,56 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  static final _logger = Logger('HomeScreen');
-  
+class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   bool _isLoggingOut = false;
-  late AnimationController _fadeController;
-  late AnimationController _slideController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeAnimations();
+  List<Widget> _screens(bool isAuthenticated) {
+    return [
+      _FastHomeTab(
+        onExplore: () => _selectIndex(1),
+        onUpdates: () => _selectIndex(2),
+        onPeople: () => _selectIndex(3),
+      ),
+      const ExploreFastScreen(),
+      const UpdatesScreen(),
+      const PeopleScreen(),
+      MoreScreen(
+        isAuthenticated: isAuthenticated,
+        onOpenAdmin: _openAdminLogin,
+        onLogout: _logout,
+      ),
+    ];
   }
 
-  void _initializeAnimations() {
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    );
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
-    );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
-    
-    _fadeController.forward();
-    _slideController.forward();
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    _slideController.dispose();
-    super.dispose();
-  }
-
-  List<Widget> get _screens => [
-        HomeTab(
-          onExploreDepartments: _navigateToDepartments,
-          fadeAnimation: _fadeAnimation,
-          slideAnimation: _slideAnimation,
-        ),
-        const DepartmentsScreen(),
-        const AnnouncementsScreen(),
-        const StaffScreen(),
-      ];
-
-  void _navigateToDepartments() {
+  void _selectIndex(int index) {
     setState(() {
-      _selectedIndex = 1;
+      _selectedIndex = index;
     });
   }
 
-  void _onItemTapped(int index) {
-    if (index == _screens.length) {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      if (authService.isLoggedIn) {
-        _logout();
-      } else {
-        _openAdminLogin();
-      }
-    } else {
-      setState(() {
-        _selectedIndex = index;
-      });
-    }
-  }
-
   void _openAdminLogin() {
-    Navigator.push(
+    Navigator.of(
       context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
+    ).push(MaterialPageRoute<void>(builder: (_) => const LoginScreen()));
   }
 
   Future<void> _logout() async {
     setState(() {
       _isLoggingOut = true;
     });
-    
+
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       await authService.signOut();
-      
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-          (route) => false,
-        );
+      if (!mounted) {
+        return;
       }
-    } catch (e) {
-      _logger.severe('Logout failed', e);
-      
-      if (mounted) {
-        _showErrorSnackBar('Logout failed. Please try again.');
-      }
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -137,66 +81,735 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red[600],
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        action: SnackBarAction(
-          label: 'Dismiss',
-          textColor: Colors.white,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
+  @override
+  Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isAuthenticated = authService.isLoggedIn;
+    final screens = _screens(isAuthenticated);
+
+    return Scaffold(
+      backgroundColor: FastBrand.shellBackground,
+      appBar: _ShellAppBar(title: _titleForIndex(_selectedIndex)),
+      body: Stack(
+        children: [
+          IndexedStack(index: _selectedIndex, children: screens),
+          if (_isLoggingOut)
+            Positioned.fill(
+              child: Container(
+                color: Colors.white.withValues(alpha: 0.78),
+                child: const Center(
+                  child: CircularProgressIndicator(color: mustBlue),
+                ),
+              ),
+            ),
+        ],
       ),
+      bottomNavigationBar: _ShellNavigationBar(
+        selectedIndex: _selectedIndex,
+        onSelected: _selectIndex,
+      ),
+    );
+  }
+
+  String _titleForIndex(int index) {
+    switch (index) {
+      case 1:
+        return 'Explore FAST';
+      case 2:
+        return 'Updates';
+      case 3:
+        return 'People';
+      case 4:
+        return 'More';
+      default:
+        return 'Home';
+    }
+  }
+}
+
+class _FastHomeTab extends StatefulWidget {
+  const _FastHomeTab({
+    required this.onExplore,
+    required this.onUpdates,
+    required this.onPeople,
+  });
+
+  final VoidCallback onExplore;
+  final VoidCallback onUpdates;
+  final VoidCallback onPeople;
+
+  @override
+  State<_FastHomeTab> createState() => _FastHomeTabState();
+}
+
+class _FastHomeTabState extends State<_FastHomeTab> {
+  late Future<_HomeData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _loadData();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _future = _loadData();
+    });
+    await _future;
+  }
+
+  Future<_HomeData> _loadData() async {
+    final firestore = FirebaseFirestore.instance;
+    final results = await Future.wait([
+      firestore.collection('faculty_info').doc('fast').get(),
+      firestore.collection('featured_stories').get(),
+      firestore
+          .collection('announcements')
+          .orderBy('postedAt', descending: true)
+          .limit(8)
+          .get(),
+    ]);
+
+    final facultySnapshot =
+        results[0] as DocumentSnapshot<Map<String, dynamic>>;
+    final storiesSnapshot = results[1] as QuerySnapshot<Map<String, dynamic>>;
+    final announcementsSnapshot =
+        results[2] as QuerySnapshot<Map<String, dynamic>>;
+    final facultyInfo = facultySnapshot.data() ?? <String, dynamic>{};
+
+    final stories = storiesSnapshot.docs
+      .map((doc) => _FeaturedStory.fromMap(doc.id, doc.data()))
+      .where((story) => story.isPublished)
+      .toList(growable: true)..sort((a, b) {
+      if (a.order != b.order) {
+        return a.order.compareTo(b.order);
+      }
+      return b.publishedAt.compareTo(a.publishedAt);
+    });
+
+    final announcements = announcementsSnapshot.docs
+        .map((doc) => Announcement.fromJson(doc.data(), doc.id))
+        .where((announcement) => announcement.isPublished)
+        .toList(growable: false);
+
+    final deanProfile = await _resolveDeanProfile(facultyInfo, firestore);
+
+    return _HomeData(
+      facultyInfo: facultyInfo,
+      featuredStory: stories.isEmpty ? null : stories.first,
+      announcements: announcements,
+      deanProfile: deanProfile,
+    );
+  }
+
+  Future<_DeanProfile> _resolveDeanProfile(
+    Map<String, dynamic> facultyInfo,
+    FirebaseFirestore firestore,
+  ) async {
+    final fallbackName =
+        _readOptionalString(facultyInfo, 'deanName') ??
+        _readOptionalString(facultyInfo, 'dean_name') ??
+        'Dean';
+    final fallbackMessage =
+        _readOptionalString(facultyInfo, 'deanMessage') ??
+        _readOptionalString(facultyInfo, 'dean_message') ??
+        'A dean welcome message will appear here once updated.';
+    final fallbackPhoto = _readFirstAvailableString(facultyInfo, const [
+      'deanPhotoUrl',
+      'dean_photo_url',
+      'deanImageUrl',
+      'dean_image_url',
+      'photoUrl',
+      'imageUrl',
+    ]);
+
+    final deanId = _readOptionalString(facultyInfo, 'deanId');
+    if (deanId != null) {
+      final deanDoc = await firestore.collection('staff').doc(deanId).get();
+      final deanData = deanDoc.data();
+      if (deanData != null) {
+        return _DeanProfile(
+          name: _readOptionalString(deanData, 'name') ?? fallbackName,
+          message: _readOptionalString(deanData, 'bio') ?? fallbackMessage,
+          photoUrl: _readOptionalString(deanData, 'photoUrl') ?? fallbackPhoto,
+        );
+      }
+    }
+
+    final deanQuery =
+        await firestore
+            .collection('staff')
+            .where('roleType', isEqualTo: 'dean')
+            .limit(1)
+            .get();
+    if (deanQuery.docs.isNotEmpty) {
+      final deanData = deanQuery.docs.first.data();
+      return _DeanProfile(
+        name: _readOptionalString(deanData, 'name') ?? fallbackName,
+        message: _readOptionalString(deanData, 'bio') ?? fallbackMessage,
+        photoUrl: _readOptionalString(deanData, 'photoUrl') ?? fallbackPhoto,
+      );
+    }
+
+    final allStaff = await firestore.collection('staff').limit(20).get();
+    for (final doc in allStaff.docs) {
+      final staffData = doc.data();
+      final position =
+          _readOptionalString(staffData, 'position')?.toLowerCase() ?? '';
+      if (position.contains('dean')) {
+        return _DeanProfile(
+          name: _readOptionalString(staffData, 'name') ?? fallbackName,
+          message: _readOptionalString(staffData, 'bio') ?? fallbackMessage,
+          photoUrl: _readOptionalString(staffData, 'photoUrl') ?? fallbackPhoto,
+        );
+      }
+    }
+
+    return _DeanProfile(
+      name: fallbackName,
+      message: fallbackMessage,
+      photoUrl: fallbackPhoto,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      extendBodyBehindAppBar: true,
-      appBar: _buildAppBar(),
-      body: _isLoggingOut ? _buildLogoutScreen() : _screens[_selectedIndex],
-      bottomNavigationBar: _buildBottomNavigationBar(),
+    return FutureBuilder<_HomeData>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: mustBlue),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return _HomeErrorState(onRetry: _refresh);
+        }
+
+        final data = snapshot.data ?? _HomeData.empty();
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          color: mustBlue,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+            children: [
+              _buildHero(data),
+              const SizedBox(height: 16),
+              _buildStats(data),
+              const SizedBox(height: 16),
+              if (data.featuredStory != null)
+                _buildFeaturedStory(data.featuredStory!),
+              if (data.featuredStory != null) const SizedBox(height: 16),
+              const QuickLinksGrid(
+                title: 'Quick Links',
+                subtitle: 'Verified student systems and support tools.',
+              ),
+              const SizedBox(height: 16),
+              _buildLatestUpdates(data.announcements),
+              const SizedBox(height: 16),
+              _buildDeanSpotlight(data.deanProfile),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  Widget _buildHero(_HomeData data) {
+    final facultyInfo = data.facultyInfo;
+    final heroTitle =
+        _readOptionalString(facultyInfo, 'heroTitle') ?? 'Explore FAST';
+    final heroSubtitle =
+        _readOptionalString(facultyInfo, 'heroSubtitle') ??
+        'A faculty platform for discovery, updates, people, and student support.';
+    final heroImageUrl =
+        _readOptionalString(facultyInfo, 'heroImageUrl') ??
+        _readOptionalString(facultyInfo, 'faculty_image_url');
+
+    return Container(
+      decoration: FastBrand.heroDecoration(),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: SafeRemoteImage(
+              imageUrl: heroImageUrl,
+              assetFallbackPath: 'assets/images/home/fast_building_hero.jpg',
+              fit: BoxFit.cover,
+              fallback: DecoratedBox(
+                decoration: BoxDecoration(gradient: FastBrand.heroGradient),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    FastBrand.primary.withValues(alpha: 0.94),
+                    FastBrand.primaryStrong.withValues(alpha: 0.82),
+                    FastBrand.secondary.withValues(alpha: 0.74),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: FastBrand.glassPillDecoration(),
+                  child: const Text(
+                    'FAST Home',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  heroTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  heroSubtitle,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontSize: 15,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: widget.onExplore,
+                      icon: const Icon(Icons.travel_explore_rounded),
+                      label: const Text('Explore FAST'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: mustBlue,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: widget.onUpdates,
+                      icon: const Icon(Icons.campaign_rounded),
+                      label: const Text('Latest Updates'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: widget.onPeople,
+                      icon: const Icon(Icons.people_alt_rounded),
+                      label: const Text('People'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStats(_HomeData data) {
+    final stats = _extractStats(data.facultyInfo);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: FastBrand.surfaceDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Faculty Highlights',
+            style: TextStyle(
+              color: FastBrand.primary,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Live highlights pulled from the restructured faculty record.',
+            style: const TextStyle(color: FastBrand.mutedText, height: 1.5),
+          ),
+          const SizedBox(height: 18),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final singleColumn = width < 260;
+              final compact = width < 320;
+              final valueFontSize = compact ? 22.0 : 24.0;
+              final childAspectRatio =
+                  singleColumn ? 2.6 : (compact ? 1.08 : 1.32);
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: stats.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: singleColumn ? 1 : 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: childAspectRatio,
+                ),
+                itemBuilder: (context, index) {
+                  final stat = stats[index];
+                  return Container(
+                    padding: EdgeInsets.all(compact ? 14 : 16),
+                    decoration: FastBrand.mutedSurfaceDecoration(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          stat.value,
+                          style: TextStyle(
+                            color: FastBrand.primary,
+                            fontSize: valueFontSize,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Expanded(
+                          child: Text(
+                            stat.label,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: FastBrand.supportText,
+                              fontWeight: FontWeight.w600,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturedStory(_FeaturedStory story) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: FastBrand.surfaceDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: FastBrand.solidPillDecoration(FastBrand.secondary),
+            child: const Text(
+              'Featured FAST Story',
+              style: TextStyle(
+                color: FastBrand.secondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            story.title,
+            style: const TextStyle(
+              color: FastBrand.headingText,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            story.summary,
+            style: const TextStyle(color: FastBrand.supportText, height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLatestUpdates(List<Announcement> announcements) {
+    final visible = announcements.take(4).toList(growable: false);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: FastBrand.surfaceDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Latest Updates',
+            style: TextStyle(
+              color: FastBrand.primary,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Recent notices and deadlines from the FAST updates stream.',
+            style: const TextStyle(color: FastBrand.mutedText, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          if (visible.isEmpty)
+            Text(
+              'No updates are published yet.',
+              style: const TextStyle(color: FastBrand.mutedText),
+            )
+          else
+            ...visible.map(
+              (announcement) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder:
+                              (_) => AnnouncementDetailsScreen(
+                                announcement: announcement,
+                              ),
+                        ),
+                      );
+                    },
+                    child: Ink(
+                      padding: const EdgeInsets.all(16),
+                      decoration: FastBrand.mutedSurfaceDecoration(radius: 20),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: FastBrand.tintDecoration(
+                              FastBrand.primary,
+                              radius: 14,
+                            ),
+                            child: const Icon(
+                              Icons.campaign_rounded,
+                              color: FastBrand.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  announcement.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: FastBrand.headingText,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  announcement.displayType,
+                                  style: const TextStyle(
+                                    color: FastBrand.mutedText,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 16,
+                            color: FastBrand.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeanSpotlight(_DeanProfile deanProfile) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: FastBrand.surfaceDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Dean Spotlight',
+            style: TextStyle(
+              color: FastBrand.primary,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth < 320;
+
+              final details = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    deanProfile.name,
+                    style: const TextStyle(
+                      color: FastBrand.headingText,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    deanProfile.message,
+                    style: const TextStyle(
+                      color: FastBrand.supportText,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
+              );
+
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _DeanAvatar(imageUrl: deanProfile.photoUrl),
+                    const SizedBox(height: 14),
+                    details,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _DeanAvatar(imageUrl: deanProfile.photoUrl),
+                  const SizedBox(width: 14),
+                  Expanded(child: details),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<_StatItem> _extractStats(Map<String, dynamic> facultyInfo) {
+    final rawStats = facultyInfo['stats'];
+    if (rawStats is List) {
+      final stats = rawStats
+          .whereType<Map>()
+          .map((entry) {
+            final data = Map<String, dynamic>.from(entry);
+            return _StatItem(
+              label: _readString(data, 'label', 'Stat'),
+              value: '${data['value'] ?? 0}',
+            );
+          })
+          .toList(growable: false);
+      if (stats.isNotEmpty) {
+        return stats;
+      }
+    }
+
+    return const [
+      _StatItem(label: 'Departments', value: '0'),
+      _StatItem(label: 'Programs', value: '0'),
+      _StatItem(label: 'Staff', value: '0'),
+      _StatItem(label: 'Updates', value: '0'),
+    ];
+  }
+}
+
+class _ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _ShellAppBar({required this.title});
+
+  final String title;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(74);
+
+  @override
+  Widget build(BuildContext context) {
     return AppBar(
       elevation: 0,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      titleSpacing: 20,
       title: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 15,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              color: FastBrand.logoSurface,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: Image.asset('assets/images/MUST_LOGO.png', height: 28),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset('assets/images/MUST_LOGO.png', height: 32),
-                const SizedBox(width: 8),
                 const Text(
-                  'FAST connect',
+                  FastBrand.shortName,
                   style: TextStyle(
-                    color: mustBlue,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
+                    color: FastBrand.primary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: FastBrand.mutedText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -204,374 +817,330 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
-      centerTitle: true,
-    );
-  }
-
-  Widget _buildLogoutScreen() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mustBlue.withOpacity(0.1),
-            Colors.white,
-          ],
-        ),
-      ),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: mustBlue,
-              strokeWidth: 3,
-            ),
-            SizedBox(height: 24),
-            Text(
-              'Signing out...',
-              style: TextStyle(
-                fontSize: 16,
-                color: mustBlue,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final isAuthenticated = authService.isLoggedIn;
-
-    return Container(
-      height: kBottomNavigationBarHeight + 15, // REDUCED height to match smaller content
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(25),
-          topRight: Radius.circular(25),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 30,
-            offset: const Offset(0, -8),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // REDUCED padding
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildNavItem(Icons.home_rounded, 'Home', 0),
-              _buildNavItem(Icons.account_balance_rounded, 'Dept', 1), // SHORTENED to prevent horizontal overflow
-              _buildNavItem(Icons.campaign_rounded, 'News', 2),
-              _buildNavItem(Icons.people_rounded, 'Staff', 3),
-              _buildNavItem(
-                isAuthenticated
-                    ? Icons.logout_rounded
-                    : Icons.admin_panel_settings_rounded,
-                isAuthenticated ? 'Logout' : 'Admin',
-                4,
-                semanticsLabel:
-                    isAuthenticated
-                        ? 'Logout from app'
-                        : 'Open admin sign in',
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(
-    IconData icon,
-    String label,
-    int index, {
-    String? semanticsLabel,
-  }) {
-    final isSelected = _selectedIndex == index;
-    final isAction = index == _screens.length;
-    final isLogout = label == 'Logout';
-    final inactiveColor =
-        isAction
-            ? (isLogout ? Colors.red.shade600 : mustGreen)
-            : Colors.grey.shade600;
-    
-    return Semantics(
-      label: semanticsLabel ?? 'Navigate to $label',
-      button: true,
-      child: GestureDetector(
-        onTap: () => _onItemTapped(index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // REDUCED padding
-          decoration: BoxDecoration(
-            color: isSelected && !isAction ? mustBlue.withOpacity(0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                padding: const EdgeInsets.all(3), // REDUCED padding
-                decoration: BoxDecoration(
-                  color: isSelected && !isAction ? mustBlue.withOpacity(0.2) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: isSelected ? mustBlue : inactiveColor,
-                  size: 22, // REDUCED icon size
-                ),
-              ),
-              const SizedBox(height: 2), // REDUCED spacing
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? mustBlue : inactiveColor,
-                  fontSize: 10, // REDUCED font size
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
 
-class HomeTab extends StatefulWidget {
-  final VoidCallback onExploreDepartments;
-  final Animation<double> fadeAnimation;
-  final Animation<Offset> slideAnimation;
-
-  const HomeTab({
-    super.key,
-    required this.onExploreDepartments,
-    required this.fadeAnimation,
-    required this.slideAnimation,
+class _ShellNavigationBar extends StatelessWidget {
+  const _ShellNavigationBar({
+    required this.selectedIndex,
+    required this.onSelected,
   });
 
-  @override
-  State<HomeTab> createState() => _HomeTabState();
-}
+  static const List<_ShellNavItemData> _items = [
+    _ShellNavItemData(
+      label: 'Home',
+      compactLabel: 'Home',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      color: FastBrand.primary,
+      accentColor: FastBrand.primaryStrong,
+    ),
+    _ShellNavItemData(
+      label: 'Explore FAST',
+      compactLabel: 'Explore',
+      icon: Icons.travel_explore_outlined,
+      selectedIcon: Icons.travel_explore_rounded,
+      color: FastBrand.secondary,
+      accentColor: FastBrand.primaryStrong,
+    ),
+    _ShellNavItemData(
+      label: 'Updates',
+      compactLabel: 'Updates',
+      icon: Icons.campaign_outlined,
+      selectedIcon: Icons.campaign_rounded,
+      color: FastBrand.warning,
+      accentColor: FastBrand.primary,
+    ),
+    _ShellNavItemData(
+      label: 'People',
+      compactLabel: 'People',
+      icon: Icons.groups_outlined,
+      selectedIcon: Icons.groups_rounded,
+      color: FastBrand.secondary,
+      accentColor: FastBrand.primary,
+    ),
+    _ShellNavItemData(
+      label: 'More',
+      compactLabel: 'More',
+      icon: Icons.grid_view_outlined,
+      selectedIcon: Icons.grid_view_rounded,
+      color: FastBrand.primary,
+      accentColor: FastBrand.secondary,
+    ),
+  ];
 
-class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
-  static final _logger = Logger('HomeTab');
-  
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializePulseAnimation();
-  }
-
-  void _initializePulseAnimation() {
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-    _pulseController.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  Future<Map<String, dynamic>> _fetchHomeData(
-    FacultyInfoService facultyInfoService,
-    DepartmentService departmentService,
-    ProgramService programService,
-    StaffService staffService,
-  ) async {
-    try {
-      final facultyInfo = (await facultyInfoService.getFacultyInfo()) as Map<String, dynamic>? ?? {};
-      final departments = await departmentService.getDepartments().first;
-      
-      final departmentCount = _safeParseInt(departments.length);
-
-      int programCount = 0;
-      for (var dept in departments) {
-        try {
-          final programs = await programService.getPrograms(dept.id).first;
-          programCount += _safeParseInt(programs.length);
-        } catch (e) {
-          _logger.warning('Failed to get programs for department ${dept.id}', e);
-        }
-      }
-
-      final staff = await staffService.getStaff().first;
-      final staffCount = _safeParseInt(staff.length);
-
-      return {
-        'faculty_info': facultyInfo,
-        'department_count': departmentCount,
-        'program_count': programCount,
-        'staff_count': staffCount,
-      };
-    } catch (e) {
-      _logger.severe('Error fetching home data', e);
-      return {
-        'faculty_info': _getDefaultFacultyInfo(),
-        'department_count': 0,
-        'program_count': 0,
-        'staff_count': 0,
-      };
-    }
-  }
-
-  int _safeParseInt(dynamic value) {
-    if (value is int) return value;
-    if (value is String) return int.tryParse(value) ?? 0;
-    if (value is num) return value.toInt();
-    return 0;
-  }
-
-  Map<String, dynamic> _getDefaultFacultyInfo() {
-    return {
-      'dean_name': 'Dr. Dean Name',
-      'dean_photo_url': '',
-      'dean_message': 'Welcome to the Faculty of Applied Sciences & Technology...',
-      'faculty_image_url': '',
-      'faculty_vision': 'To be a leading faculty in applied sciences and technology...',
-      'faculty_mission': 'To provide quality education, conduct innovative research...',
-      'faculty_values': [
-        'Excellence in education and research',
-        'Innovation and creativity',
-        'Integrity and transparency',
-        'Collaboration and teamwork',
-        'Sustainability and social responsibility'
-      ]
-    };
-  }
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final facultyInfoService = Provider.of<FacultyInfoService>(context, listen: false);
-    final departmentService = Provider.of<DepartmentService>(context, listen: false);
-    final programService = Provider.of<ProgramService>(context, listen: false);
-    final staffService = Provider.of<StaffService>(context, listen: false);
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 390;
 
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _fetchHomeData(
-        facultyInfoService,
-        departmentService,
-        programService,
-        staffService,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingState();
-        }
-
-        if (snapshot.hasError) {
-          return _buildErrorState();
-        }
-
-        final data = snapshot.data ?? _getDefaultData();
-        final facultyInfo = data['faculty_info'] as Map<String, dynamic>;
-        final departmentCount = data['department_count'] as int;
-        final programCount = data['program_count'] as int;
-        final staffCount = data['staff_count'] as int;
-        const studentCount = 1500;
-
-        return _buildHomeContent(facultyInfo, departmentCount, programCount, staffCount, studentCount);
-      },
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mustBlue.withOpacity(0.1),
-            Colors.white,
-          ],
-        ),
-      ),
-      child: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: mustBlue, strokeWidth: 3),
-            SizedBox(height: 16),
-            Text(
-              'Loading...',
-              style: TextStyle(
-                fontSize: 16,
-                color: mustBlue,
-                fontWeight: FontWeight.w500,
-              ),
+    return SafeArea(
+      top: false,
+      minimum: EdgeInsets.fromLTRB(16, 8, 16, compact ? 10 : 14),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: FastBrand.border.withValues(alpha: 0.95)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x15000000),
+              blurRadius: 24,
+              offset: Offset(0, 10),
             ),
           ],
         ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 6 : 10,
+            vertical: compact ? 8 : 10,
+          ),
+          child: Row(
+            children: List.generate(_items.length, (index) {
+              final item = _items[index];
+              final selected = selectedIndex == index;
+              final label = compact ? item.compactLabel : item.label;
+
+              return Expanded(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () => onSelected(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 2 : 4,
+                        vertical: compact ? 6 : 8,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        gradient:
+                            selected
+                                ? LinearGradient(
+                                  colors: [
+                                    item.color.withValues(alpha: 0.16),
+                                    item.accentColor.withValues(alpha: 0.08),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                )
+                                : null,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            width: compact ? 34 : 38,
+                            height: compact ? 34 : 38,
+                            decoration: BoxDecoration(
+                              gradient:
+                                  selected
+                                      ? LinearGradient(
+                                        colors: [item.color, item.accentColor],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                      : null,
+                              color: selected ? null : FastBrand.logoSurface,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              selected ? item.selectedIcon : item.icon,
+                              color:
+                                  selected ? Colors.white : FastBrand.mutedText,
+                              size: compact ? 18 : 20,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color:
+                                  selected ? item.color : FastBrand.mutedText,
+                              fontWeight:
+                                  selected ? FontWeight.w800 : FontWeight.w600,
+                              fontSize: compact ? 10.2 : 11.2,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildErrorState() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mustBlue.withOpacity(0.1),
-            Colors.white,
-          ],
-        ),
+class _ShellNavItemData {
+  const _ShellNavItemData({
+    required this.label,
+    required this.compactLabel,
+    required this.icon,
+    required this.selectedIcon,
+    required this.color,
+    required this.accentColor,
+  });
+
+  final String label;
+  final String compactLabel;
+  final IconData icon;
+  final IconData selectedIcon;
+  final Color color;
+  final Color accentColor;
+}
+
+class _DeanAvatar extends StatelessWidget {
+  const _DeanAvatar({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeNetworkAvatar(
+      radius: 36,
+      imageUrl: imageUrl,
+      backgroundColor: const Color(0xFFEAF1FB),
+      fallbackIconColor: FastBrand.primary,
+      fallbackIconSize: 34,
+    );
+  }
+}
+
+class _HomeData {
+  const _HomeData({
+    required this.facultyInfo,
+    required this.featuredStory,
+    required this.announcements,
+    required this.deanProfile,
+  });
+
+  factory _HomeData.empty() {
+    return const _HomeData(
+      facultyInfo: <String, dynamic>{},
+      featuredStory: null,
+      announcements: <Announcement>[],
+      deanProfile: _DeanProfile.empty(),
+    );
+  }
+
+  final Map<String, dynamic> facultyInfo;
+  final _FeaturedStory? featuredStory;
+  final List<Announcement> announcements;
+  final _DeanProfile deanProfile;
+}
+
+class _DeanProfile {
+  const _DeanProfile({
+    required this.name,
+    required this.message,
+    required this.photoUrl,
+  });
+
+  const _DeanProfile.empty()
+    : name = 'Dean',
+      message = 'A dean welcome message will appear here once updated.',
+      photoUrl = null;
+
+  final String name;
+  final String message;
+  final String? photoUrl;
+}
+
+class _FeaturedStory {
+  const _FeaturedStory({
+    required this.id,
+    required this.title,
+    required this.summary,
+    required this.order,
+    required this.publishedAt,
+    required this.status,
+  });
+
+  factory _FeaturedStory.fromMap(String id, Map<String, dynamic> data) {
+    return _FeaturedStory(
+      id: id,
+      title: _readString(data, 'title', 'Untitled story'),
+      summary: _readString(
+        data,
+        'summary',
+        _readString(data, 'content', 'No summary available yet.'),
       ),
-      child: Center(
+      order: _readInt(data, 'order'),
+      publishedAt: _readDate(data, 'publishedAt'),
+      status: _readString(data, 'status', 'draft'),
+    );
+  }
+
+  final String id;
+  final String title;
+  final String summary;
+  final int order;
+  final DateTime publishedAt;
+  final String status;
+
+  bool get isPublished => status == 'published';
+}
+
+class _StatItem {
+  const _StatItem({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+class _HomeErrorState extends StatelessWidget {
+  const _HomeErrorState({required this.onRetry});
+
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Unable to load data',
+            Icon(
+              Icons.error_outline_rounded,
+              size: 56,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Home could not load right now.',
               style: TextStyle(
-                color: Colors.red[600],
                 fontSize: 18,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                color: FastBrand.headingText,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Please check your connection and try again',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
-              ),
+              'Please check your Firestore connection and try again.',
+              style: const TextStyle(color: FastBrand.mutedText, height: 1.5),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             ElevatedButton(
-              onPressed: () => setState(() {}),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: mustBlue,
-                foregroundColor: Colors.white,
-              ),
+              onPressed: () => onRetry(),
               child: const Text('Retry'),
             ),
           ],
@@ -579,896 +1148,61 @@ class _HomeTabState extends State<HomeTab> with TickerProviderStateMixin {
       ),
     );
   }
-
-  Map<String, dynamic> _getDefaultData() {
-    return {
-      'faculty_info': _getDefaultFacultyInfo(),
-      'department_count': 0,
-      'program_count': 0,
-      'staff_count': 0,
-    };
-  }
-
-  Widget _buildHomeContent(
-    Map<String, dynamic> facultyInfo,
-    int departmentCount,
-    int programCount,
-    int staffCount,
-    int studentCount,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mustBlue.withOpacity(0.95),
-            mustGreen.withOpacity(0.8),
-          ],
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.of(context).size.height,
-            ),
-            child: Column(
-              children: [
-                _buildHeroSection(facultyInfo),
-                Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(35),
-                      topRight: Radius.circular(35),
-                    ),
-                  ),
-                  child: FadeTransition(
-                    opacity: widget.fadeAnimation,
-                    child: SlideTransition(
-                      position: widget.slideAnimation,
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 20),
-                          _buildStatsSection(departmentCount, programCount, staffCount, studentCount),
-                          _buildDeanSection(facultyInfo),
-                          _buildVisionMissionSection(facultyInfo),
-                          _buildValuesSection(facultyInfo),
-                          _buildMustPortalsSection(context),
-                          SizedBox(height: MediaQuery.of(context).padding.bottom + 120), // REDUCED bottom padding to match smaller nav bar
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _readTextValue(
-    Map<String, dynamic> data,
-    String key,
-    String fallback,
-  ) {
-    final value = data[key];
-    if (value is String && value.trim().isNotEmpty) {
-      return value.trim();
-    }
-    return fallback;
-  }
-
-  String? _readImageUrl(Map<String, dynamic> data, String key) {
-    final value = data[key];
-    if (value is! String) {
-      return null;
-    }
-
-    final trimmed = value.trim();
-    if (trimmed.isEmpty || trimmed.contains('via.placeholder.com')) {
-      return null;
-    }
-
-    return trimmed;
-  }
-
-  Widget _buildHeroSection(Map<String, dynamic> facultyInfo) {
-    final heroImageUrl = _readImageUrl(facultyInfo, 'faculty_image_url');
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Container(
-        height: 390,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.18),
-              blurRadius: 26,
-              offset: const Offset(0, 16),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _buildHeroBackground(heroImageUrl),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.10),
-                    mustBlue.withOpacity(0.72),
-                    Colors.black.withOpacity(0.88),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              top: -30,
-              right: -30,
-              child: Container(
-                width: 170,
-                height: 170,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: mustGreen.withOpacity(0.18),
-                ),
-              ),
-            ),
-            Positioned(
-              left: -40,
-              bottom: -70,
-              child: Container(
-                width: 230,
-                height: 230,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.08),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _pulseAnimation.value,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.24),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.auto_awesome_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Welcome to FAST',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: mustYellow.withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Text(
-                      'Smart orientation hub',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Faculty of Applied Sciences\n& Technology',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Mbarara University of Science and Technology',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.95),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: const [
-                      _HeroPill(
-                        icon: Icons.apartment_rounded,
-                        label: 'Departments',
-                      ),
-                      _HeroPill(
-                        icon: Icons.hub_rounded,
-                        label: 'Innovation-led',
-                      ),
-                      _HeroPill(
-                        icon: Icons.groups_rounded,
-                        label: 'Student-ready',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeroBackground(String? imageUrl) {
-    if (imageUrl != null) {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder:
-            (context, error, stackTrace) => Image.asset(
-              'assets/images/home/fast_building_hero.jpg',
-              fit: BoxFit.cover,
-            ),
-      );
-    }
-
-    return Image.asset(
-      'assets/images/home/fast_building_hero.jpg',
-      fit: BoxFit.cover,
-    );
-  }
-
-  Widget _buildStatsSection(int deptCount, int progCount, int staffCount, int studentCount) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mustBlue,
-            mustBlue.withOpacity(0.9),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: mustBlue.withOpacity(0.4),
-            blurRadius: 25,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'FAST at a Glance',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(child: _buildStatItem('$deptCount', 'Departments', Icons.account_balance)),
-                  _buildDivider(),
-                  Expanded(child: _buildStatItem('$progCount', 'Programs', Icons.school)),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: _buildStatItem('$staffCount', 'Staff', Icons.people)),
-                  _buildDivider(),
-                  Expanded(child: _buildStatItem('$studentCount+', 'Students', Icons.groups)),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String number, String label, IconData icon) {
-    return Semantics(
-      label: '$label: $number',
-      button: true,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$label: $number'),
-              duration: const Duration(seconds: 1),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          child: Column(
-            children: [
-              Icon(icon, color: Colors.white.withOpacity(0.9), size: 24),
-              const SizedBox(height: 8),
-              Text(
-                number,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withOpacity(0.95),
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(
-      width: 1,
-      height: 60,
-      color: Colors.white.withOpacity(0.3),
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-    );
-  }
-
-  Widget _buildDeanSection(Map<String, dynamic> facultyInfo) {
-    final deanName = _readTextValue(
-      facultyInfo,
-      'dean_name',
-      'Dean, FAST',
-    );
-    final deanMessage = _readTextValue(
-      facultyInfo,
-      'dean_message',
-      'Welcome to our faculty. We are building a learning environment shaped by innovation, applied science, and student growth.',
-    );
-    final deanImageUrl = _readImageUrl(facultyInfo, 'dean_photo_url');
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 25,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final useRowLayout = constraints.maxWidth > 620;
-            final photo = Container(
-              width: useRowLayout ? 220 : double.infinity,
-              height: useRowLayout ? 280 : 240,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: mustBlue.withOpacity(0.16),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child:
-                  deanImageUrl != null
-                      ? Image.network(
-                        deanImageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder:
-                            (context, error, stackTrace) => _DeanImageFallback(),
-                      )
-                      : _DeanImageFallback(),
-            );
-
-            final messagePanel = Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFF),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: mustBlue.withOpacity(0.12)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: mustGreen.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: const Text(
-                      'Dean Spotlight',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: mustGreen,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    deanName,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: mustBlue,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Dean, Faculty of Applied Sciences & Technology',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Icon(Icons.format_quote, color: mustBlue, size: 22),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Message from the Dean',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: mustBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    deanMessage,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[700],
-                      height: 1.65,
-                    ),
-                  ),
-                ],
-              ),
-            );
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: mustBlue.withOpacity(0.10),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.person_pin_rounded,
-                        color: mustBlue,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Text(
-                        'Leadership Welcome',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: mustBlue,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                if (useRowLayout)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      photo,
-                      const SizedBox(width: 20),
-                      Expanded(child: messagePanel),
-                    ],
-                  )
-                else ...[
-                  photo,
-                  const SizedBox(height: 18),
-                  SizedBox(width: double.infinity, child: messagePanel),
-                ],
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVisionMissionSection(Map<String, dynamic> facultyInfo) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.visibility_rounded,
-                  title: 'Vision',
-                  content: facultyInfo['faculty_vision'] ?? 'Faculty vision...',
-                  color: mustBlue,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildInfoCard(
-                  icon: Icons.flag_rounded,
-                  title: 'Mission',
-                  content: facultyInfo['faculty_mission'] ?? 'Faculty mission...',
-                  color: mustGreen,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required IconData icon,
-    required String title,
-    required String content,
-    required Color color,
-  }) {
-    return Semantics(
-      label: 'Tap to read full $title',
-      button: true,
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Row(
-                children: [
-                  Icon(icon, color: color),
-                  const SizedBox(width: 8),
-                  Text(title),
-                ],
-              ),
-              content: Text(content),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
-          );
-        },
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                content,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[700],
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap to read more',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: color.withOpacity(0.7),
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildValuesSection(Map<String, dynamic> facultyInfo) {
-    final facultyValues = facultyInfo['faculty_values'] as List<dynamic>? ?? [];
-    
-    return Container(
-      margin: const EdgeInsets.all(24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 25,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFB300).withOpacity(0.15), // University yellow
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.stars_rounded,
-                  color: Color(0xFFFFB300),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                'Our Values',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: mustBlue,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          ...facultyValues.asMap().entries.map((entry) {
-            int index = entry.key;
-            String value = entry.value.toString();
-            final colors = [mustBlue, mustGreen, const Color(0xFFFFB300), mustBlue, mustGreen]; // Only university colors
-            final color = colors[index % colors.length];
-            
-            return Semantics(
-              label: 'Value: $value',
-              button: true,
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Value: $value'),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: color.withOpacity(0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.check_circle,
-                          color: color,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          value,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMustPortalsSection(BuildContext context) {
-    return QuickLinksGrid(
-      title: 'MUST Quick Links',
-      subtitle: 'Verified student services with one shared source of truth',
-    );
-  }
 }
 
-class _HeroPill extends StatelessWidget {
-  const _HeroPill({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
+String? _readOptionalString(Map<String, dynamic> data, String key) {
+  final value = data[key];
+  if (value is String && value.trim().isNotEmpty) {
+    return value.trim();
   }
+  return null;
 }
 
-class _DeanImageFallback extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [mustBlue, mustGreen],
-        ),
-      ),
-      child: Center(
-        child: Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.14),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.person_rounded,
-            color: Colors.white,
-            size: 52,
-          ),
-        ),
-      ),
-    );
+String? _readFirstAvailableString(
+  Map<String, dynamic> data,
+  List<String> keys,
+) {
+  for (final key in keys) {
+    final value = _readOptionalString(data, key);
+    if (value != null) {
+      return value;
+    }
   }
+  return null;
+}
+
+String _readString(Map<String, dynamic> data, String key, String fallback) {
+  final value = data[key];
+  if (value is String && value.trim().isNotEmpty) {
+    return value.trim();
+  }
+  return fallback;
+}
+
+int _readInt(Map<String, dynamic> data, String key) {
+  final value = data[key];
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value.trim()) ?? 0;
+  }
+  return 0;
+}
+
+DateTime _readDate(Map<String, dynamic> data, String key) {
+  final value = data[key];
+  if (value is Timestamp) {
+    return value.toDate();
+  }
+  if (value is DateTime) {
+    return value;
+  }
+  if (value is String) {
+    return DateTime.tryParse(value) ?? DateTime.now();
+  }
+  return DateTime.now();
 }

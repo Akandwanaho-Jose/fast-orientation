@@ -1,7 +1,7 @@
 import 'package:fast/core/models/quick_link.dart';
 import 'package:fast/core/services/link_launcher_service.dart';
 import 'package:fast/core/services/quick_links_service.dart';
-import 'package:fast/core/utils/constants.dart';
+import 'package:fast/core/theme/fast_brand.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -10,11 +10,11 @@ class QuickLinksGrid extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
-    this.padding = const EdgeInsets.all(20),
+    this.padding = EdgeInsets.zero,
     this.physics = const NeverScrollableScrollPhysics(),
     this.shrinkWrap = true,
     this.crossAxisCount = 2,
-    this.childAspectRatio = 1.1,
+    this.childAspectRatio = 0.82,
   });
 
   final String title;
@@ -46,20 +46,9 @@ class QuickLinksGrid extends StatelessWidget {
               padding: padding,
               child: Container(
                 margin: EdgeInsets.symmetric(
-                  horizontal: layout.outerSpacing,
                   vertical: layout.outerSpacing * 0.5,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
+                decoration: FastBrand.surfaceDecoration(radius: 24),
                 child: Padding(
                   padding: EdgeInsets.all(layout.innerSpacing),
                   child: Column(
@@ -75,12 +64,13 @@ class QuickLinksGrid extends StatelessWidget {
                           shrinkWrap: shrinkWrap,
                           physics: physics,
                           itemCount: links.length,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: layout.crossAxisCount,
-                            crossAxisSpacing: layout.gridSpacing,
-                            mainAxisSpacing: layout.gridSpacing,
-                            childAspectRatio: layout.childAspectRatio,
-                          ),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: layout.crossAxisCount,
+                                crossAxisSpacing: layout.gridSpacing,
+                                mainAxisSpacing: layout.gridSpacing,
+                                childAspectRatio: layout.childAspectRatio,
+                              ),
                           itemBuilder: (context, index) {
                             return _buildLinkCard(
                               context,
@@ -105,7 +95,7 @@ class QuickLinksGrid extends StatelessWidget {
       return const _QuickLinksLayout(
         crossAxisCount: 4,
         childAspectRatio: 1.02,
-        outerSpacing: 24,
+        outerSpacing: 12,
         innerSpacing: 20,
         gridSpacing: 14,
       );
@@ -113,29 +103,47 @@ class QuickLinksGrid extends StatelessWidget {
     if (width >= 760) {
       return const _QuickLinksLayout(
         crossAxisCount: 3,
-        childAspectRatio: 0.98,
-        outerSpacing: 20,
+        childAspectRatio: 0.94,
+        outerSpacing: 10,
         innerSpacing: 18,
+        gridSpacing: 12,
+      );
+    }
+    if (width >= 430) {
+      return const _QuickLinksLayout(
+        crossAxisCount: 2,
+        childAspectRatio: 0.92,
+        outerSpacing: 8,
+        innerSpacing: 16,
         gridSpacing: 12,
       );
     }
     if (width >= 360) {
       final resolvedAspectRatio =
-          childAspectRatio < 0.92
-              ? 0.92
-              : (childAspectRatio > 1.22 ? 1.22 : childAspectRatio);
+          childAspectRatio < 0.72
+              ? 0.72
+              : (childAspectRatio > 0.88 ? 0.88 : childAspectRatio);
       return _QuickLinksLayout(
         crossAxisCount: crossAxisCount,
         childAspectRatio: resolvedAspectRatio,
-        outerSpacing: 14,
+        outerSpacing: 6,
         innerSpacing: 14,
-        gridSpacing: 12,
+        gridSpacing: 10,
+      );
+    }
+    if (width >= 300) {
+      return const _QuickLinksLayout(
+        crossAxisCount: 2,
+        childAspectRatio: 0.68,
+        outerSpacing: 4,
+        innerSpacing: 12,
+        gridSpacing: 10,
       );
     }
     return const _QuickLinksLayout(
       crossAxisCount: 1,
-      childAspectRatio: 2.2,
-      outerSpacing: 10,
+      childAspectRatio: 1.85,
+      outerSpacing: 2,
       innerSpacing: 12,
       gridSpacing: 10,
     );
@@ -154,7 +162,7 @@ class QuickLinksGrid extends StatelessWidget {
               height: 48,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [mustBlue, mustGreen],
+                  colors: [FastBrand.primary, FastBrand.secondary],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -179,7 +187,7 @@ class QuickLinksGrid extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
-                      color: mustBlue,
+                      color: FastBrand.primary,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -190,7 +198,7 @@ class QuickLinksGrid extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[500],
+                      color: FastBrand.mutedText,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -204,9 +212,11 @@ class QuickLinksGrid extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: mustBlue.withOpacity(0.05),
+              color: FastBrand.primary.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: mustBlue.withOpacity(0.10)),
+              border: Border.all(
+                color: FastBrand.primary.withValues(alpha: 0.10),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,7 +224,7 @@ class QuickLinksGrid extends StatelessWidget {
                 Icon(
                   Icons.info_outline_rounded,
                   size: 14,
-                  color: mustBlue.withOpacity(0.75),
+                  color: FastBrand.primary.withValues(alpha: 0.75),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -224,7 +234,7 @@ class QuickLinksGrid extends StatelessWidget {
                     'will update these without an app release.',
                     style: TextStyle(
                       fontSize: 11,
-                      color: Colors.grey[600],
+                      color: FastBrand.mutedText,
                       height: 1.45,
                     ),
                   ),
@@ -242,9 +252,9 @@ class QuickLinksGrid extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: FastBrand.softSurface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: FastBrand.border),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -255,7 +265,7 @@ class QuickLinksGrid extends StatelessWidget {
             'No quick links available right now.',
             style: TextStyle(
               fontSize: 13,
-              color: Colors.grey[500],
+              color: FastBrand.mutedText,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -287,10 +297,10 @@ class QuickLinksGrid extends StatelessWidget {
                 colors: link.gradientColors,
               ),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
               boxShadow: [
                 BoxShadow(
-                  color: link.color.withOpacity(0.24),
+                  color: link.color.withValues(alpha: 0.24),
                   blurRadius: 24,
                   offset: const Offset(0, 14),
                 ),
@@ -301,17 +311,24 @@ class QuickLinksGrid extends StatelessWidget {
                 final h = cardConstraints.maxHeight;
                 final w = cardConstraints.maxWidth;
                 final narrow = w < 170;
-                final compact = h < 180 || narrow;
+                final ultraCompact = h < 150 || w < 124;
+                final compact = h < 190 || narrow;
                 final spacious = h >= 225 && w >= 185;
-                final double pad = compact ? 12 : (spacious ? 18 : 15);
+                final double pad =
+                    ultraCompact ? 10 : (compact ? 12 : (spacious ? 18 : 15));
                 final double graphicFrameSize =
-                    compact ? 66 : (spacious ? 92 : 78);
-                final double graphicSize = compact ? 36 : (spacious ? 52 : 44);
+                    ultraCompact ? 54 : (compact ? 66 : (spacious ? 92 : 78));
+                final double graphicSize =
+                    ultraCompact ? 28 : (compact ? 36 : (spacious ? 52 : 44));
                 final double titleSize =
-                    compact ? 10.8 : (spacious ? 15.2 : 13.2);
-                final double subtitleSize = compact ? 9.6 : 10.8;
-                final bool showSubtitle = h >= 166;
-                final bool showOpen = h >= 110;
+                    ultraCompact
+                        ? 9.8
+                        : (compact ? 10.8 : (spacious ? 15.2 : 13.2));
+                final double subtitleSize =
+                    ultraCompact ? 8.8 : (compact ? 9.6 : 10.8);
+                final bool showSubtitle = h >= 160 && !ultraCompact;
+                final bool showOpen = h >= 182 && !narrow;
+                final bool showBadge = h >= 160 && w >= 130;
 
                 return SizedBox(
                   width: w,
@@ -326,7 +343,7 @@ class QuickLinksGrid extends StatelessWidget {
                           height: w * 0.62,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.14),
+                            color: Colors.white.withValues(alpha: 0.14),
                           ),
                         ),
                       ),
@@ -338,7 +355,7 @@ class QuickLinksGrid extends StatelessWidget {
                           height: w * 0.46,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.08),
+                            color: Colors.white.withValues(alpha: 0.08),
                           ),
                         ),
                       ),
@@ -350,7 +367,7 @@ class QuickLinksGrid extends StatelessWidget {
                           height: w * 0.44,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withValues(alpha: 0.08),
                           ),
                         ),
                       ),
@@ -361,15 +378,15 @@ class QuickLinksGrid extends StatelessWidget {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.white.withOpacity(0.10),
+                                Colors.white.withValues(alpha: 0.10),
                                 Colors.transparent,
-                                Colors.black.withOpacity(0.10),
+                                Colors.black.withValues(alpha: 0.10),
                               ],
                             ),
                           ),
                         ),
                       ),
-                      if (!compact)
+                      if (showBadge)
                         Positioned(
                           top: pad,
                           right: pad,
@@ -392,7 +409,7 @@ class QuickLinksGrid extends StatelessWidget {
                             const Spacer(),
                             Text(
                               link.title,
-                              maxLines: 2,
+                              maxLines: ultraCompact ? 1 : 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: titleSize,
@@ -410,7 +427,7 @@ class QuickLinksGrid extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: subtitleSize,
-                                  color: Colors.white.withOpacity(0.92),
+                                  color: Colors.white.withValues(alpha: 0.92),
                                   fontWeight: FontWeight.w500,
                                   height: 1.22,
                                 ),
@@ -424,10 +441,10 @@ class QuickLinksGrid extends StatelessWidget {
                                   vertical: compact ? 5 : 7,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.16),
+                                  color: Colors.white.withValues(alpha: 0.16),
                                   borderRadius: BorderRadius.circular(999),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.18),
+                                    color: Colors.white.withValues(alpha: 0.18),
                                   ),
                                 ),
                                 child: Row(
@@ -479,15 +496,15 @@ class QuickLinksGrid extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.28),
-            Colors.white.withOpacity(0.12),
+            Colors.white.withValues(alpha: 0.28),
+            Colors.white.withValues(alpha: 0.12),
           ],
         ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -495,7 +512,7 @@ class QuickLinksGrid extends StatelessWidget {
       ),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.96),
+          color: Colors.white.withValues(alpha: 0.96),
           borderRadius: BorderRadius.circular(18),
         ),
         child: _buildLinkGraphic(link, graphicSize),
@@ -510,9 +527,9 @@ class QuickLinksGrid extends StatelessWidget {
         vertical: compact ? 4 : 5,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

@@ -5,6 +5,7 @@
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
+    "seed:fast-db": "node seed_restructured_database.js",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },

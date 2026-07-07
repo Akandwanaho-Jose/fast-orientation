@@ -481,19 +481,57 @@ class _FacultyProfileSectionState extends State<FacultyProfileSection> {
 
   Future<List<Map<String, dynamic>>> _buildStats() async {
     final firestore = FirebaseFirestore.instance;
-    final departments = await firestore.collection('departments').count().get();
-    final staff = await firestore.collection('staff').count().get();
+    final departmentsSnapshot = await firestore.collection('departments').get();
+    final publishedDepartments = departmentsSnapshot.docs
+        .where((doc) {
+          return readString(doc.data(), 'status', 'published') == 'published';
+        })
+        .toList(growable: false);
+    final staff =
+        await firestore
+            .collection('staff')
+            .where('status', isEqualTo: 'published')
+            .count()
+            .get();
     final programDepartments = await firestore.collection('departments').get();
-    var programCount = 0;
+    final programKeys = <String>{};
     for (final doc in programDepartments.docs) {
-      final programs = await doc.reference.collection('programs').count().get();
-      programCount += programs.count ?? 0;
+      final programs = await doc.reference.collection('programs').get();
+      for (final programDoc in programs.docs) {
+        final data = programDoc.data();
+        if (readString(data, 'status', 'draft') != 'published') {
+          continue;
+        }
+        final slug = readString(data, 'slug', programDoc.id);
+        final name = readString(data, 'name', slug);
+        programKeys.add(_programStatKey(slug: slug, name: name));
+      }
     }
     return [
-      {'label': 'Departments', 'value': departments.count ?? 0},
-      {'label': 'Programs', 'value': programCount},
+      {'label': 'Departments', 'value': publishedDepartments.length},
+      {'label': 'Programs', 'value': programKeys.length},
       {'label': 'Staff', 'value': staff.count ?? 0},
     ];
+  }
+
+  String _programStatKey({required String slug, required String name}) {
+    final normalizedName =
+        name
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+    if (normalizedName.isNotEmpty) {
+      return 'name:$normalizedName';
+    }
+
+    final normalizedSlug = slug.trim().toLowerCase();
+    if (normalizedSlug.isNotEmpty) {
+      return 'slug:$normalizedSlug';
+    }
+
+    return 'program:unknown';
   }
 
   Widget _field(

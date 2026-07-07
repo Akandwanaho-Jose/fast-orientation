@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fast/core/services/link_launcher_service.dart';
 import 'package:fast/core/theme/fast_brand.dart';
 import 'package:fast/core/utils/constants.dart';
+import 'package:fast/features/orientation/models/orientation_content_item.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -53,9 +54,9 @@ class _MoreScreenState extends State<MoreScreen> {
     final supportSnapshot = results[2] as QuerySnapshot<Map<String, dynamic>>;
 
     final orientationItems = orientationSnapshot.docs
-      .map((doc) => _ContentItem.fromMap(doc.id, doc.data()))
+      .map((doc) => OrientationContentItem.fromMap(doc.id, doc.data()))
       .where((item) => item.isPublished)
-      .toList(growable: true)..sort((a, b) => a.order.compareTo(b.order));
+      .toList(growable: true)..sort(OrientationContentItem.compareForDisplay);
 
     final supportItems = supportSnapshot.docs
       .map((doc) => _SupportItem.fromMap(doc.id, doc.data()))
@@ -97,9 +98,9 @@ class _MoreScreenState extends State<MoreScreen> {
                 _buildHero(),
                 const SizedBox(height: 16),
                 _SectionCard(
-                  title: 'First-Year Orientation Guide',
+                  title: 'Orientation',
                   subtitle:
-                      'Orientation remains part of the wider FAST experience.',
+                      'Guides, checklists, resources, and support content for FAST students.',
                   child: _buildOrientationContent(data.orientationItems),
                 ),
                 _SectionCard(
@@ -174,7 +175,7 @@ class _MoreScreenState extends State<MoreScreen> {
     );
   }
 
-  Widget _buildOrientationContent(List<_ContentItem> items) {
+  Widget _buildOrientationContent(List<OrientationContentItem> items) {
     if (items.isEmpty) {
       return const _EmptyMessage(
         icon: Icons.menu_book_rounded,
@@ -358,10 +359,7 @@ class _MoreScreenState extends State<MoreScreen> {
             widget.isAuthenticated
                 ? 'Use this to leave the public app view and return to signed-out browsing.'
                 : 'Keep this entry here instead of in the bottom navigation so the public shell stays focused on students and visitors.',
-            style: const TextStyle(
-              color: FastBrand.supportText,
-              height: 1.5,
-            ),
+            style: const TextStyle(color: FastBrand.supportText, height: 1.5),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
@@ -403,10 +401,7 @@ class _MoreScreenState extends State<MoreScreen> {
             const SizedBox(height: 8),
             Text(
               'Please check your Firestore connection and try again.',
-              style: const TextStyle(
-                color: FastBrand.mutedText,
-                height: 1.5,
-              ),
+              style: const TextStyle(color: FastBrand.mutedText, height: 1.5),
               textAlign: TextAlign.center,
             ),
           ],
@@ -449,59 +444,14 @@ class _MoreData {
   factory _MoreData.empty() {
     return const _MoreData(
       facultyInfo: <String, dynamic>{},
-      orientationItems: <_ContentItem>[],
+      orientationItems: <OrientationContentItem>[],
       supportItems: <_SupportItem>[],
     );
   }
 
   final Map<String, dynamic> facultyInfo;
-  final List<_ContentItem> orientationItems;
+  final List<OrientationContentItem> orientationItems;
   final List<_SupportItem> supportItems;
-}
-
-class _ContentItem {
-  const _ContentItem({
-    required this.id,
-    required this.title,
-    required this.summary,
-    required this.category,
-    required this.order,
-    required this.status,
-  });
-
-  factory _ContentItem.fromMap(String id, Map<String, dynamic> data) {
-    return _ContentItem(
-      id: id,
-      title: _readString(data, 'title', 'Untitled section'),
-      summary: _readString(
-        data,
-        'summary',
-        _readString(data, 'content', 'No summary available yet.'),
-      ),
-      category: _readString(data, 'category', 'orientation'),
-      order: _readInt(data, 'order'),
-      status: _readString(data, 'status', 'draft'),
-    );
-  }
-
-  final String id;
-  final String title;
-  final String summary;
-  final String category;
-  final int order;
-  final String status;
-
-  bool get isPublished => status == 'published';
-  String get categoryLabel {
-    return category
-        .split(RegExp(r'[-_\s]+'))
-        .where((word) => word.isNotEmpty)
-        .map(
-          (word) =>
-              '${word.substring(0, 1).toUpperCase()}${word.substring(1).toLowerCase()}',
-        )
-        .join(' ');
-  }
 }
 
 class _SupportItem {
@@ -631,16 +581,16 @@ class _InfoCard extends StatelessWidget {
                       horizontal: 10,
                       vertical: 6,
                     ),
-                  decoration: FastBrand.solidPillDecoration(
-                    FastBrand.secondary,
-                  ),
-                  child: Text(
-                    trailing!,
-                    style: const TextStyle(
-                      color: FastBrand.secondary,
-                      fontWeight: FontWeight.w700,
+                    decoration: FastBrand.solidPillDecoration(
+                      FastBrand.secondary,
                     ),
-                  ),
+                    child: Text(
+                      trailing!,
+                      style: const TextStyle(
+                        color: FastBrand.secondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 10),
                 ],
@@ -702,10 +652,7 @@ class _SupportCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             item.description,
-            style: const TextStyle(
-              color: FastBrand.supportText,
-              height: 1.5,
-            ),
+            style: const TextStyle(color: FastBrand.supportText, height: 1.5),
           ),
           const SizedBox(height: 12),
           Wrap(

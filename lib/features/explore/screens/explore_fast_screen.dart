@@ -6,6 +6,7 @@ import 'package:fast/features/departments/models/department.dart';
 import 'package:fast/features/departments/models/program.dart';
 import 'package:fast/features/departments/screens/department_details_screen.dart';
 import 'package:fast/features/departments/screens/program_details_screen.dart';
+import 'package:fast/features/orientation/models/orientation_content_item.dart';
 import 'package:flutter/material.dart';
 
 class ExploreFastScreen extends StatefulWidget {
@@ -126,9 +127,9 @@ class _ExploreFastScreenState extends State<ExploreFastScreen> {
     });
 
     final orientationItems = orientationSnapshot.docs
-      .map((doc) => _OrientationItem.fromMap(doc.id, doc.data()))
+      .map((doc) => OrientationContentItem.fromMap(doc.id, doc.data()))
       .where((item) => item.isPublished)
-      .toList(growable: true)..sort((a, b) => a.order.compareTo(b.order));
+      .toList(growable: true)..sort(OrientationContentItem.compareForDisplay);
 
     final facilityItems = facilitiesSnapshot.docs
       .map((doc) => _FacilityItem.fromMap(doc.id, doc.data()))
@@ -201,6 +202,7 @@ class _ExploreFastScreenState extends State<ExploreFastScreen> {
         _readString(data.facultyInfo, 'faculty_image_url');
 
     return Container(
+      width: double.infinity,
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 16),
       decoration: FastBrand.heroDecoration(),
       clipBehavior: Clip.antiAlias,
@@ -409,7 +411,7 @@ class _ExploreFastScreenState extends State<ExploreFastScreen> {
   }
 
   Widget _buildStudentExperienceSection(
-    List<_OrientationItem> orientationItems,
+    List<OrientationContentItem> orientationItems,
   ) {
     return _SectionCard(
       title: 'Student Experience',
@@ -520,7 +522,7 @@ class _ExploreData {
       departments: <Department>[],
       programs: <_ProgramExplorerItem>[],
       stories: <_StoryItem>[],
-      orientationItems: <_OrientationItem>[],
+      orientationItems: <OrientationContentItem>[],
       facilityItems: <_FacilityItem>[],
     );
   }
@@ -529,7 +531,7 @@ class _ExploreData {
   final List<Department> departments;
   final List<_ProgramExplorerItem> programs;
   final List<_StoryItem> stories;
-  final List<_OrientationItem> orientationItems;
+  final List<OrientationContentItem> orientationItems;
   final List<_FacilityItem> facilityItems;
 }
 
@@ -560,11 +562,6 @@ List<_ProgramExplorerItem> _dedupePrograms(List<_ProgramExplorerItem> items) {
 }
 
 String _programDedupKey(Program program) {
-  final slug = program.slug.trim().toLowerCase();
-  if (slug.isNotEmpty) {
-    return 'slug:$slug';
-  }
-
   final normalizedName =
       program.name
           .trim()
@@ -572,8 +569,16 @@ String _programDedupKey(Program program) {
           .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
+  if (normalizedName.isNotEmpty) {
+    return 'name:$normalizedName';
+  }
 
-  return 'name:$normalizedName';
+  final slug = program.slug.trim().toLowerCase();
+  if (slug.isNotEmpty) {
+    return 'slug:$slug';
+  }
+
+  return 'program:${program.hashCode}';
 }
 
 class _StoryItem {
@@ -615,56 +620,6 @@ class _StoryItem {
   final String status;
 
   bool get isPublished => status == 'published';
-}
-
-class _OrientationItem {
-  const _OrientationItem({
-    required this.id,
-    required this.title,
-    required this.summary,
-    required this.category,
-    required this.imageUrl,
-    required this.order,
-    required this.status,
-  });
-
-  factory _OrientationItem.fromMap(String id, Map<String, dynamic> data) {
-    return _OrientationItem(
-      id: id,
-      title: _readString(data, 'title', 'Untitled section'),
-      summary: _readString(
-        data,
-        'summary',
-        _readString(data, 'content', 'No summary available yet.'),
-      ),
-      category: _readString(data, 'category', 'orientation'),
-      imageUrl: _readNullableString(data, 'imageUrl'),
-      order: _readInt(data, 'order'),
-      status: _readString(data, 'status', 'draft'),
-    );
-  }
-
-  final String id;
-  final String title;
-  final String summary;
-  final String category;
-  final String? imageUrl;
-  final int order;
-  final String status;
-
-  bool get isPublished => status == 'published';
-
-  String get categoryLabel {
-    if (category.isEmpty) return 'Guide';
-    return category
-        .split(RegExp(r'[-_\s]+'))
-        .where((word) => word.isNotEmpty)
-        .map(
-          (word) =>
-              '${word.substring(0, 1).toUpperCase()}${word.substring(1).toLowerCase()}',
-        )
-        .join(' ');
-  }
 }
 
 class _FacilityItem {
@@ -1006,6 +961,7 @@ Color _departmentAccentColor(String shortName) {
       return const Color(0xFF1C7ED6);
     case 'MIE':
       return const Color(0xFFB06A12);
+    case 'PEM':
     case 'PEEM':
       return const Color(0xFF0D8B75);
     default:

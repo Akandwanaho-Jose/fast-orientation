@@ -8,7 +8,7 @@ import 'package:fast/features/annoucements/models/announcement.dart';
 import 'package:fast/features/annoucements/screens/annoucement_details_screen.dart';
 import 'package:fast/features/auth/screens/login_screen.dart';
 import 'package:fast/features/explore/screens/explore_fast_screen.dart';
-import 'package:fast/features/more/screens/more_screen.dart';
+import 'package:fast/features/orientation/screens/orientation_screen.dart';
 import 'package:fast/features/people/screens/people_screen.dart';
 import 'package:fast/features/quick_links/widgets/quick_links_grid.dart';
 import 'package:fast/features/updates/screens/updates_screen.dart';
@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const ExploreFastScreen(),
       const UpdatesScreen(),
       const PeopleScreen(),
-      MoreScreen(
+      OrientationScreen(
         isAuthenticated: isAuthenticated,
         onOpenAdmin: _openAdminLogin,
         onLogout: _logout,
@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return 'People';
       case 4:
-        return 'More';
+        return 'Orientation';
       default:
         return 'Home';
     }
@@ -193,13 +193,79 @@ class _FastHomeTabState extends State<_FastHomeTab> {
         .toList(growable: false);
 
     final deanProfile = await _resolveDeanProfile(facultyInfo, firestore);
+    final stats = await _loadLiveStats(firestore);
 
     return _HomeData(
       facultyInfo: facultyInfo,
       featuredStory: stories.isEmpty ? null : stories.first,
       announcements: announcements,
       deanProfile: deanProfile,
+      stats: stats,
     );
+  }
+
+  Future<List<_StatItem>> _loadLiveStats(FirebaseFirestore firestore) async {
+    final departmentsSnapshot = await firestore.collection('departments').get();
+    final publishedDepartments = departmentsSnapshot.docs
+        .where((doc) {
+          return _readString(doc.data(), 'status', 'published') == 'published';
+        })
+        .toList(growable: false);
+
+    final programKeys = <String>{};
+    for (final department in publishedDepartments) {
+      final programsSnapshot =
+          await department.reference.collection('programs').get();
+      for (final programDoc in programsSnapshot.docs) {
+        final data = programDoc.data();
+        if (_readString(data, 'status', 'draft') != 'published') {
+          continue;
+        }
+        final slug = _readString(data, 'slug', programDoc.id);
+        final name = _readString(data, 'name', slug);
+        programKeys.add(_programStatKey(slug: slug, name: name));
+      }
+    }
+
+    final staffCount =
+        await firestore
+            .collection('staff')
+            .where('status', isEqualTo: 'published')
+            .count()
+            .get();
+    final updateCount =
+        await firestore
+            .collection('announcements')
+            .where('status', isEqualTo: 'published')
+            .count()
+            .get();
+
+    return [
+      _StatItem(label: 'Departments', value: '${publishedDepartments.length}'),
+      _StatItem(label: 'Programs', value: '${programKeys.length}'),
+      _StatItem(label: 'Staff', value: '${staffCount.count ?? 0}'),
+      _StatItem(label: 'Updates', value: '${updateCount.count ?? 0}'),
+    ];
+  }
+
+  String _programStatKey({required String slug, required String name}) {
+    final normalizedName =
+        name
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+    if (normalizedName.isNotEmpty) {
+      return 'name:$normalizedName';
+    }
+
+    final normalizedSlug = slug.trim().toLowerCase();
+    if (normalizedSlug.isNotEmpty) {
+      return 'slug:$normalizedSlug';
+    }
+
+    return 'program:unknown';
   }
 
   Future<_DeanProfile> _resolveDeanProfile(
@@ -329,6 +395,7 @@ class _FastHomeTabState extends State<_FastHomeTab> {
         _readOptionalString(facultyInfo, 'faculty_image_url');
 
     return Container(
+      width: double.infinity,
       decoration: FastBrand.heroDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -443,7 +510,8 @@ class _FastHomeTabState extends State<_FastHomeTab> {
   }
 
   Widget _buildStats(_HomeData data) {
-    final stats = _extractStats(data.facultyInfo);
+    final stats =
+        data.stats.isNotEmpty ? data.stats : _extractStats(data.facultyInfo);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -861,10 +929,10 @@ class _ShellNavigationBar extends StatelessWidget {
       accentColor: FastBrand.primary,
     ),
     _ShellNavItemData(
-      label: 'More',
-      compactLabel: 'More',
-      icon: Icons.grid_view_outlined,
-      selectedIcon: Icons.grid_view_rounded,
+      label: 'Orientation',
+      compactLabel: 'Orient',
+      icon: Icons.menu_book_outlined,
+      selectedIcon: Icons.menu_book_rounded,
       color: FastBrand.primary,
       accentColor: FastBrand.secondary,
     ),
@@ -1029,6 +1097,7 @@ class _HomeData {
     required this.featuredStory,
     required this.announcements,
     required this.deanProfile,
+    required this.stats,
   });
 
   factory _HomeData.empty() {
@@ -1037,6 +1106,7 @@ class _HomeData {
       featuredStory: null,
       announcements: <Announcement>[],
       deanProfile: _DeanProfile.empty(),
+      stats: <_StatItem>[],
     );
   }
 
@@ -1044,6 +1114,7 @@ class _HomeData {
   final _FeaturedStory? featuredStory;
   final List<Announcement> announcements;
   final _DeanProfile deanProfile;
+  final List<_StatItem> stats;
 }
 
 class _DeanProfile {

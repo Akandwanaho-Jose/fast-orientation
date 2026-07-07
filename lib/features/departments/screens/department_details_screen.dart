@@ -13,7 +13,15 @@ class DepartmentDetailsScreen extends StatefulWidget {
   const DepartmentDetailsScreen({super.key, required this.department});
 
   @override
-  State<DepartmentDetailsScreen> createState() => _DepartmentDetailsScreenState();
+  State<DepartmentDetailsScreen> createState() =>
+      _DepartmentDetailsScreenState();
+}
+
+class _ProgramListRecord {
+  const _ProgramListRecord({required this.program, required this.docId});
+
+  final Program program;
+  final String docId;
 }
 
 class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
@@ -21,11 +29,11 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
-  
+
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   bool _isAppBarCollapsed = false;
   bool _isDescriptionExpanded = false;
   bool _isDisposed = false;
@@ -42,15 +50,15 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    
+
     _slideAnimation = Tween<double>(begin: 0.3, end: 0.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
     );
-    
+
     _animationController.forward();
   }
 
@@ -84,7 +92,14 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
     BoxFit fit = BoxFit.cover,
     Widget? fallback,
   }) {
-    if (imageUrl == null || imageUrl.isEmpty) {
+    final trimmedUrl = imageUrl?.trim() ?? '';
+    final uri = Uri.tryParse(trimmedUrl);
+    final isRemoteImage =
+        uri != null &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
+
+    if (!isRemoteImage) {
       return fallback ?? _buildImageFallback(width, height);
     }
 
@@ -92,38 +107,39 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     int? memCacheWidth;
     int? memCacheHeight;
-    
+
     if (width != double.infinity && !width.isNaN) {
       memCacheWidth = (width * devicePixelRatio).round();
     }
-    
+
     if (height != double.infinity && !height.isNaN) {
       memCacheHeight = (height * devicePixelRatio).round();
     }
 
     return CachedNetworkImage(
-      imageUrl: imageUrl,
+      imageUrl: trimmedUrl,
       width: width,
       height: height,
       fit: fit,
-      placeholder: (context, url) => Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(mustBlue),
+      placeholder:
+          (context, url) => Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(mustBlue),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
       errorWidget: (context, url, error) {
         // Log error for debugging in development
         debugPrint('Error loading image: $url - $error');
@@ -145,10 +161,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            mustBlue.withOpacity(0.8),
-            mustGreen.withOpacity(0.6),
-          ],
+          colors: [mustBlue.withOpacity(0.8), mustGreen.withOpacity(0.6)],
         ),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -190,10 +203,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              mustBlue.withOpacity(0.05),
-              Colors.white,
-            ],
+            colors: [mustBlue.withOpacity(0.05), Colors.white],
           ),
         ),
         child: CustomScrollView(
@@ -423,10 +433,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                         icon: AnimatedRotation(
                           turns: _isDescriptionExpanded ? 0.5 : 0,
                           duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            Icons.expand_more,
-                            color: mustBlue,
-                          ),
+                          child: Icon(Icons.expand_more, color: mustBlue),
                         ),
                         onPressed: () {
                           _updateState(() {
@@ -481,9 +488,10 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                       const SizedBox(height: 16),
                       AnimatedCrossFade(
                         duration: const Duration(milliseconds: 300),
-                        crossFadeState: _isDescriptionExpanded
-                            ? CrossFadeState.showSecond
-                            : CrossFadeState.showFirst,
+                        crossFadeState:
+                            _isDescriptionExpanded
+                                ? CrossFadeState.showSecond
+                                : CrossFadeState.showFirst,
                         firstChild: Text(
                           widget.department.description.length > 200
                               ? '${widget.department.description.substring(0, 200)}...'
@@ -517,12 +525,15 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: mustGreen.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                  color: mustGreen.withOpacity(0.3)),
+                                color: mustGreen.withOpacity(0.3),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -536,8 +547,11 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                Icon(Icons.expand_more,
-                                    color: mustGreen, size: 16),
+                                Icon(
+                                  Icons.expand_more,
+                                  color: mustGreen,
+                                  size: 16,
+                                ),
                               ],
                             ),
                           ),
@@ -557,7 +571,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
   Widget _buildHeadOfDepartmentSection() {
     final headMessage = widget.department.safeHeadMessage;
     final headImageUrl = widget.department.headImageUrl;
-    
+
     return SliverToBoxAdapter(
       child: FadeTransition(
         opacity: _fadeAnimation,
@@ -777,11 +791,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                         color: mustGreen.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        Icons.school,
-                        color: mustGreen,
-                        size: 24,
-                      ),
+                      child: Icon(Icons.school, color: mustGreen, size: 24),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -799,10 +809,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                 const SizedBox(height: 8),
                 Text(
                   'Explore our comprehensive degree programs',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 20),
                 Container(
@@ -828,18 +835,21 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                       hintText: 'Search programs...',
                       hintStyle: TextStyle(color: Colors.grey[400]),
                       prefixIcon: Icon(Icons.search, color: mustBlue),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear,
-                                  color: Colors.grey[400]),
-                              onPressed: () {
-                                _searchController.clear();
-                                _updateState(() {
-                                  _searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
+                      suffixIcon:
+                          _searchQuery.isNotEmpty
+                              ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey[400],
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _updateState(() {
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                              : null,
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 20,
@@ -856,72 +866,89 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
     );
   }
 
-
-
-
-
   Widget _buildProgramsList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('departments')
-          .doc(widget.department.id)
-          .collection('programs')
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('departments')
+              .doc(widget.department.id)
+              .collection('programs')
+              .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return SliverToBoxAdapter(child: _buildLoadingState());
         }
-        
+
         if (snapshot.hasError) {
           debugPrint('Error loading programs: ${snapshot.error}');
           return SliverToBoxAdapter(child: _buildErrorState());
         }
-        
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return SliverToBoxAdapter(child: _buildEmptyState());
         }
 
         final programDocs = snapshot.data!.docs;
-        final uniquePrograms = <String, Program>{};
-        
+        final uniquePrograms = <String, _ProgramListRecord>{};
+
         for (var doc in programDocs) {
           try {
             final data = doc.data() as Map<String, dynamic>? ?? {};
-            final program = Program.fromJson(data, []);
-            uniquePrograms[program.name] = program;
+            final program = Program.fromJson(data, [], id: doc.id);
+            if (!program.isPublished) {
+              continue;
+            }
+            uniquePrograms[_programDedupKey(program)] = _ProgramListRecord(
+              program: program,
+              docId: doc.id,
+            );
           } catch (e) {
             debugPrint('Error parsing program: $e');
           }
         }
-        
+
         final programs = uniquePrograms.values.toList();
-        final filteredPrograms = programs.where((program) {
-          return program.name.toLowerCase().contains(_searchQuery);
-        }).toList();
+        final filteredPrograms =
+            programs.where((record) {
+              return record.program.name.toLowerCase().contains(_searchQuery);
+            }).toList();
 
         if (filteredPrograms.isEmpty) {
           return SliverToBoxAdapter(child: _buildEmptySearchState());
         }
 
         return SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final program = filteredPrograms[index];
-              final docId = programDocs
-                  .where((doc) => (doc.data() as Map<String, dynamic>)['name'] == program.name)
-                  .first
-                  .id;
-              
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: _buildProgramCard(program, docId, index),
-              );
-            },
-            childCount: filteredPrograms.length,
-          ),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final record = filteredPrograms[index];
+
+            return FadeTransition(
+              opacity: _fadeAnimation,
+              child: _buildProgramCard(record.program, record.docId, index),
+            );
+          }, childCount: filteredPrograms.length),
         );
       },
     );
+  }
+
+  String _programDedupKey(Program program) {
+    final normalizedName =
+        program.name
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+    if (normalizedName.isNotEmpty) {
+      return 'name:$normalizedName';
+    }
+
+    final slug = program.slug.trim().toLowerCase();
+    if (slug.isNotEmpty) {
+      return 'slug:$slug';
+    }
+
+    return 'program:${program.hashCode}';
   }
 
   Widget _buildProgramCard(Program program, String docId, int index) {
@@ -950,17 +977,25 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
                 Navigator.push(
                   context,
                   PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) =>
-                        ProgramDetailsScreen(
-                      departmentId: widget.department.id,
-                      program: program,
-                      programDocId: docId,
-                    ),
-                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    pageBuilder:
+                        (context, animation, secondaryAnimation) =>
+                            ProgramDetailsScreen(
+                              departmentId: widget.department.id,
+                              program: program,
+                              programDocId: docId,
+                            ),
+                    transitionsBuilder: (
+                      context,
+                      animation,
+                      secondaryAnimation,
+                      child,
+                    ) {
                       return SlideTransition(
                         position: animation.drive(
-                          Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
-                              .chain(CurveTween(curve: Curves.easeInOutCubic)),
+                          Tween(
+                            begin: const Offset(1.0, 0.0),
+                            end: Offset.zero,
+                          ).chain(CurveTween(curve: Curves.easeInOutCubic)),
                         ),
                         child: child,
                       );
@@ -1065,11 +1100,15 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
 
   IconData _getProgramIcon(String programName) {
     final name = programName.toLowerCase();
-    if (name.contains('computer') || name.contains('software') || name.contains('it')) {
+    if (name.contains('computer') ||
+        name.contains('software') ||
+        name.contains('it')) {
       return Icons.computer;
     } else if (name.contains('engineering') || name.contains('tech')) {
       return Icons.engineering;
-    } else if (name.contains('business') || name.contains('management') || name.contains('admin')) {
+    } else if (name.contains('business') ||
+        name.contains('management') ||
+        name.contains('admin')) {
       return Icons.business;
     } else if (name.contains('science') || name.contains('research')) {
       return Icons.science;
@@ -1140,11 +1179,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.error_outline,
-            color: Colors.red[400],
-            size: 48,
-          ),
+          Icon(Icons.error_outline, color: Colors.red[400], size: 48),
           const SizedBox(height: 16),
           const Text(
             'Unable to Load Programs',
@@ -1185,11 +1220,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.school_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No Programs Available',
@@ -1202,9 +1233,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
           const SizedBox(height: 8),
           Text(
             'This department currently has no programs listed.',
-            style: TextStyle(
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1219,11 +1248,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No Programs Found',
@@ -1236,9 +1261,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
           const SizedBox(height: 8),
           Text(
             'Try adjusting your search criteria',
-            style: TextStyle(
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(color: Colors.grey[500]),
           ),
           const SizedBox(height: 16),
           TextButton.icon(
@@ -1250,9 +1273,7 @@ class _DepartmentDetailsScreenState extends State<DepartmentDetailsScreen>
             },
             icon: const Icon(Icons.clear),
             label: const Text('Clear Search'),
-            style: TextButton.styleFrom(
-              foregroundColor: mustBlue,
-            ),
+            style: TextButton.styleFrom(foregroundColor: mustBlue),
           ),
         ],
       ),

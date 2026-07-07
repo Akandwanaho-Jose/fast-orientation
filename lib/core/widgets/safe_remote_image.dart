@@ -26,7 +26,7 @@ class SafeRemoteImage extends StatelessWidget {
     }
 
     if (trimmed.startsWith('assets/')) {
-      return true;
+      return _isBundledAssetPath(trimmed);
     }
 
     final uri = Uri.tryParse(trimmed);
@@ -37,6 +37,13 @@ class SafeRemoteImage extends StatelessWidget {
     return uri.scheme == 'http' || uri.scheme == 'https' || uri.scheme == 'gs';
   }
 
+  static bool _isBundledAssetPath(String path) {
+    return path == 'assets/images/MUST.jpg' ||
+        path == 'assets/images/MUST_LOGO.png' ||
+        path.startsWith('assets/images/home/') ||
+        path.startsWith('assets/images/quick_links/');
+  }
+
   @override
   Widget build(BuildContext context) {
     final trimmed = imageUrl?.trim() ?? '';
@@ -45,6 +52,9 @@ class SafeRemoteImage extends StatelessWidget {
     }
 
     if (trimmed.startsWith('assets/')) {
+      if (!_isBundledAssetPath(trimmed)) {
+        return _buildFallback();
+      }
       return Image.asset(
         trimmed,
         fit: fit,

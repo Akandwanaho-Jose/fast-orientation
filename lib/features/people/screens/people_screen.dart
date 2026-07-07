@@ -426,6 +426,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
 
   Widget _buildHeroBanner() {
     return Container(
+      width: double.infinity,
       decoration: FastBrand.heroDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -576,19 +577,21 @@ class _PeopleScreenState extends State<PeopleScreen> {
   List<_DepartmentFilter> _departmentFiltersFor(List<Staff> people) {
     final counts = <String, int>{};
     final labels = <String, String>{};
+    final shortLabels = <String, String>{};
 
     for (final person in people) {
       final label = person.displayDepartment;
       final key = _departmentKey(label);
       counts.update(key, (value) => value + 1, ifAbsent: () => 1);
       labels.putIfAbsent(key, () => label);
+      shortLabels.putIfAbsent(key, () => person.displayDepartmentCode);
     }
 
     final filters = counts.entries
       .map(
         (entry) => _DepartmentFilter(
           label: labels[entry.key] ?? 'FAST',
-          shortLabel: _departmentShortLabel(labels[entry.key] ?? 'FAST'),
+          shortLabel: shortLabels[entry.key] ?? 'FAST',
           value: entry.key,
           count: entry.value,
         ),
@@ -628,49 +631,6 @@ class _PeopleScreenState extends State<PeopleScreen> {
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
         .trim();
-  }
-
-  String _departmentShortLabel(String department) {
-    final normalized = department.toLowerCase();
-
-    if (normalized.contains('electrical') &&
-        normalized.contains('electronics')) {
-      return 'EEE';
-    }
-    if (normalized.contains('biomedical')) {
-      return 'BME';
-    }
-    if (normalized.contains('civil')) {
-      return 'CVE';
-    }
-    if (normalized.contains('mechanical') &&
-        normalized.contains('industrial')) {
-      return 'MIE';
-    }
-    if ((normalized.contains('petroleum') ||
-            normalized.contains('petrolium')) &&
-        (normalized.contains('environmental') ||
-            normalized.contains('enviromental'))) {
-      return 'PEEM';
-    }
-
-    final words = department
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .toList(growable: false);
-    if (words.isEmpty) {
-      return 'FAST';
-    }
-
-    final initials =
-        words
-            .where((word) => word.length > 2 || word == words.first)
-            .map((word) => word[0].toUpperCase())
-            .join();
-
-    return initials.isEmpty
-        ? department.substring(0, 1).toUpperCase()
-        : initials;
   }
 
   Future<void> _focusStaffSearch() async {

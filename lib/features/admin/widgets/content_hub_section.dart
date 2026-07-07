@@ -329,7 +329,13 @@ class _OrientationTab extends StatelessWidget {
                         subtitle: readString(data, 'summary', 'No summary'),
                         imageUrl: readOptionalString(data, 'imageUrl'),
                         tags: [
+                          readString(
+                            data,
+                            'type',
+                            readString(data, 'category', 'orientation'),
+                          ),
                           readString(data, 'category', 'orientation'),
+                          if (readBool(data, 'pinned')) 'pinned',
                           readString(data, 'status', 'draft'),
                         ],
                         onEdit:
@@ -352,116 +358,346 @@ class _OrientationTab extends StatelessWidget {
     String? id,
     Map<String, dynamic>? data,
   }) async {
+    final existing = data ?? <String, dynamic>{};
     final titleController = TextEditingController(
-      text: readString(data ?? {}, 'title', ''),
+      text: readString(existing, 'title', ''),
     );
     final slugController = TextEditingController(
-      text: readString(data ?? {}, 'slug', ''),
+      text: readString(existing, 'slug', ''),
     );
+    const orientationTypes = [
+      'guide',
+      'checklist',
+      'deadline',
+      'resource',
+      'contact',
+      'schedule',
+    ];
+    final storedType = readString(existing, 'type', 'guide');
+    final initialType =
+        orientationTypes.contains(storedType) ? storedType : 'guide';
+    final typeController = TextEditingController(text: initialType);
     final categoryController = TextEditingController(
-      text: readString(data ?? {}, 'category', 'orientation'),
+      text: readString(existing, 'category', 'orientation'),
     );
     final summaryController = TextEditingController(
-      text: readString(data ?? {}, 'summary', ''),
+      text: readString(existing, 'summary', ''),
     );
     final contentController = TextEditingController(
-      text: readString(data ?? {}, 'content', ''),
+      text: readString(existing, 'content', ''),
     );
     final imageUrlController = TextEditingController(
-      text: readString(data ?? {}, 'imageUrl', ''),
+      text: readString(existing, 'imageUrl', ''),
     );
     final audienceController = TextEditingController(
       text: joinCsv(
         (data?['audience'] as List?)?.map((e) => '$e').toList() ?? const [],
       ),
     );
-    final orderController = TextEditingController(
-      text: '${readInt(data ?? {}, 'order', fallback: 1)}',
+    final departmentIdController = TextEditingController(
+      text: readString(existing, 'departmentId', ''),
     );
-    var status = readString(data ?? {}, 'status', 'published');
+    final actionLabelController = TextEditingController(
+      text: readString(existing, 'actionLabel', ''),
+    );
+    final actionUrlController = TextEditingController(
+      text: readString(existing, 'actionUrl', ''),
+    );
+    final orderController = TextEditingController(
+      text: '${readInt(existing, 'order', fallback: 1)}',
+    );
+    final startDateController = TextEditingController(
+      text: _formatDateValue(existing['startDate']),
+    );
+    final endDateController = TextEditingController(
+      text: _formatDateValue(existing['endDate']),
+    );
+    var status = readString(existing, 'status', 'published');
+    var type = initialType;
+    var pinned = readBool(existing, 'pinned');
 
     await showDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: Text(
-            id == null ? 'Create Orientation Entry' : 'Edit Orientation Entry',
-          ),
-          content: SizedBox(
-            width: 720,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _textField(titleController, 'Title'),
-                  _textField(slugController, 'Slug'),
-                  _textField(categoryController, 'Category'),
-                  _textField(summaryController, 'Summary', maxLines: 3),
-                  _textField(contentController, 'Content', maxLines: 5),
-                  AdminImageUrlField(
-                    controller: imageUrlController,
-                    label: 'Orientation image',
-                  ),
-                  _textField(audienceController, 'Audience (comma separated)'),
-                  _textField(orderController, 'Display order'),
-                  DropdownButtonFormField<String>(
-                    initialValue: status,
-                    decoration: _decoration('Status'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'published',
-                        child: Text('Published'),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: Text(
+                id == null
+                    ? 'Create Orientation Entry'
+                    : 'Edit Orientation Entry',
+              ),
+              content: SizedBox(
+                width: 760,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _dialogSection(
+                        title: 'Basics',
+                        children: [
+                          _textField(titleController, 'Title'),
+                          _textField(
+                            slugController,
+                            'Slug',
+                            helper:
+                                'Leave blank to generate one from the title.',
+                          ),
+                          DropdownButtonFormField<String>(
+                            initialValue: type,
+                            decoration: _decoration('Type'),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'guide',
+                                child: Text('Guide'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'checklist',
+                                child: Text('Checklist'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'deadline',
+                                child: Text('Deadline'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'resource',
+                                child: Text('Resource'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'contact',
+                                child: Text('Contact'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'schedule',
+                                child: Text('Schedule'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setDialogState(() {
+                                type = value;
+                                typeController.text = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _textField(
+                            categoryController,
+                            'Category',
+                            helper:
+                                'Example: orientation, student-support, registration.',
+                          ),
+                        ],
                       ),
-                      DropdownMenuItem(value: 'draft', child: Text('Draft')),
+                      _dialogSection(
+                        title: 'Content',
+                        children: [
+                          _textField(summaryController, 'Summary', maxLines: 3),
+                          _textField(contentController, 'Content', maxLines: 7),
+                        ],
+                      ),
+                      _dialogSection(
+                        title: 'Media',
+                        children: [
+                          AdminImageUrlField(
+                            controller: imageUrlController,
+                            label: 'Orientation image',
+                          ),
+                        ],
+                      ),
+                      _dialogSection(
+                        title: 'Targeting',
+                        children: [
+                          _textField(
+                            audienceController,
+                            'Audience',
+                            helper:
+                                'Comma separated: first-year, students, staff.',
+                          ),
+                          _textField(
+                            departmentIdController,
+                            'Department ID',
+                            helper:
+                                'Optional. Leave blank for all FAST students.',
+                          ),
+                        ],
+                      ),
+                      _dialogSection(
+                        title: 'Action',
+                        children: [
+                          _textField(
+                            actionLabelController,
+                            'Action label',
+                            helper: 'Example: Open portal, Download guide.',
+                          ),
+                          _textField(actionUrlController, 'Action URL'),
+                        ],
+                      ),
+                      _dialogSection(
+                        title: 'Scheduling',
+                        children: [
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final compact = constraints.maxWidth < 560;
+                              final children = [
+                                Expanded(
+                                  child: _dateField(
+                                    context,
+                                    startDateController,
+                                    'Start date',
+                                  ),
+                                ),
+                                const SizedBox(width: 12, height: 12),
+                                Expanded(
+                                  child: _dateField(
+                                    context,
+                                    endDateController,
+                                    'End date',
+                                  ),
+                                ),
+                              ];
+                              return compact
+                                  ? Column(
+                                    children: [
+                                      _dateField(
+                                        context,
+                                        startDateController,
+                                        'Start date',
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _dateField(
+                                        context,
+                                        endDateController,
+                                        'End date',
+                                      ),
+                                    ],
+                                  )
+                                  : Row(children: children);
+                            },
+                          ),
+                        ],
+                      ),
+                      _dialogSection(
+                        title: 'Publishing',
+                        children: [
+                          SwitchListTile.adaptive(
+                            value: pinned,
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Pin this item'),
+                            subtitle: const Text(
+                              'Pinned entries appear before regular orientation content.',
+                            ),
+                            activeThumbColor: mustBlue,
+                            onChanged:
+                                (value) => setDialogState(() => pinned = value),
+                          ),
+                          _textField(
+                            orderController,
+                            'Display order',
+                            keyboardType: TextInputType.number,
+                          ),
+                          DropdownButtonFormField<String>(
+                            initialValue: status,
+                            decoration: _decoration('Status'),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'published',
+                                child: Text('Published'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'draft',
+                                child: Text('Draft'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setDialogState(() => status = value);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        status = value;
-                      }
-                    },
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final collection = FirebaseFirestore.instance.collection(
-                  'orientation_content',
-                );
-                final doc = id == null ? collection.doc() : collection.doc(id);
-                await doc.set({
-                  'title': titleController.text.trim(),
-                  'slug':
-                      slugController.text.trim().isEmpty
-                          ? slugify(titleController.text.trim())
-                          : slugController.text.trim(),
-                  'category': categoryController.text.trim(),
-                  'summary': summaryController.text.trim(),
-                  'content': contentController.text.trim(),
-                  'imageUrl': imageUrlController.text.trim(),
-                  'audience': parseCsv(audienceController.text),
-                  'order': int.tryParse(orderController.text.trim()) ?? 1,
-                  'status': status,
-                  'updatedAt': FieldValue.serverTimestamp(),
-                }, SetOptions(merge: true));
-                if (!context.mounted) return;
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: mustBlue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Save'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final title = titleController.text.trim();
+                    if (title.isEmpty) return;
+
+                    final collection = FirebaseFirestore.instance.collection(
+                      'orientation_content',
+                    );
+                    final doc =
+                        id == null ? collection.doc() : collection.doc(id);
+                    final imageUrl = imageUrlController.text.trim();
+                    final departmentId = departmentIdController.text.trim();
+                    final actionLabel = actionLabelController.text.trim();
+                    final actionUrl = actionUrlController.text.trim();
+                    final startDate = _parseDate(startDateController.text);
+                    final endDate = _parseDate(endDateController.text);
+
+                    await doc.set({
+                      'title': title,
+                      'slug':
+                          slugController.text.trim().isEmpty
+                              ? slugify(title)
+                              : slugify(slugController.text.trim()),
+                      'type':
+                          typeController.text.trim().isEmpty
+                              ? type
+                              : typeController.text.trim(),
+                      'category': categoryController.text.trim(),
+                      'summary': summaryController.text.trim(),
+                      'content': contentController.text.trim(),
+                      'imageUrl':
+                          imageUrl.isEmpty ? FieldValue.delete() : imageUrl,
+                      'audience': parseCsv(audienceController.text),
+                      'departmentId':
+                          departmentId.isEmpty
+                              ? FieldValue.delete()
+                              : departmentId,
+                      'actionLabel':
+                          actionLabel.isEmpty
+                              ? FieldValue.delete()
+                              : actionLabel,
+                      'actionUrl':
+                          actionUrl.isEmpty ? FieldValue.delete() : actionUrl,
+                      'pinned': pinned,
+                      'order': int.tryParse(orderController.text.trim()) ?? 1,
+                      'status': status,
+                      'startDate':
+                          startDate == null
+                              ? FieldValue.delete()
+                              : Timestamp.fromDate(startDate),
+                      'endDate':
+                          endDate == null
+                              ? FieldValue.delete()
+                              : Timestamp.fromDate(endDate),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                      if (id == null) 'createdAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: mustBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1086,15 +1322,115 @@ Widget _textField(
   TextEditingController controller,
   String label, {
   int maxLines = 1,
+  String? helper,
+  TextInputType? keyboardType,
 }) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextField(
       controller: controller,
       maxLines: maxLines,
-      decoration: _decoration(label),
+      keyboardType: keyboardType,
+      decoration: _decoration(label).copyWith(helperText: helper),
     ),
   );
+}
+
+Widget _dialogSection({required String title, required List<Widget> children}) {
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFE2E8F0)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF152033),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...children,
+      ],
+    ),
+  );
+}
+
+Widget _dateField(
+  BuildContext context,
+  TextEditingController controller,
+  String label,
+) {
+  return TextField(
+    controller: controller,
+    readOnly: true,
+    decoration: _decoration(label).copyWith(
+      helperText: 'Optional',
+      suffixIcon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (controller.text.trim().isNotEmpty)
+            IconButton(
+              tooltip: 'Clear date',
+              onPressed: () => controller.clear(),
+              icon: const Icon(Icons.close_rounded),
+            ),
+          IconButton(
+            tooltip: 'Choose date',
+            onPressed: () async {
+              final now = DateTime.now();
+              final initialDate = _parseDate(controller.text) ?? now;
+              final selected = await showDatePicker(
+                context: context,
+                initialDate: initialDate,
+                firstDate: DateTime(now.year - 2),
+                lastDate: DateTime(now.year + 5),
+              );
+              if (selected != null) {
+                controller.text = _formatDate(selected);
+              }
+            },
+            icon: const Icon(Icons.calendar_month_rounded),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+String _formatDateValue(dynamic value) {
+  if (value is Timestamp) {
+    return _formatDate(value.toDate());
+  }
+  if (value is DateTime) {
+    return _formatDate(value);
+  }
+  if (value is String && value.trim().isNotEmpty) {
+    final parsed = DateTime.tryParse(value.trim());
+    return parsed == null ? value.trim() : _formatDate(parsed);
+  }
+  return '';
+}
+
+String _formatDate(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
+}
+
+DateTime? _parseDate(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(trimmed);
 }
 
 Future<void> _deleteDoc(

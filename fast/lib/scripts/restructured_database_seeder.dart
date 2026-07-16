@@ -9,8 +9,8 @@ class RestructuredDatabaseSeeder {
     this.dryRun = false,
     this.seedExamples = true,
     this.seedQuickLinks = true,
-  })  : _firestore = firestore,
-        _now = now;
+  }) : _firestore = firestore,
+       _now = now;
 
   final FirebaseFirestore _firestore;
   final DateTime _now;
@@ -52,7 +52,9 @@ class RestructuredDatabaseSeeder {
 
     if (snapshot.docs.isEmpty) {
       if (!seedExamples) {
-        _log('No departments found. Example department data seeding is disabled.');
+        _log(
+          'No departments found. Example department data seeding is disabled.',
+        );
         return;
       }
 
@@ -66,9 +68,9 @@ class RestructuredDatabaseSeeder {
           await _setDocument(programRef, program.data);
 
           for (final yearCourse in program.yearCourses) {
-            final yearRef = programRef.collection('yearCourses').doc(
-              yearCourse.id,
-            );
+            final yearRef = programRef
+                .collection('yearCourses')
+                .doc(yearCourse.id);
             await _setDocument(yearRef, yearCourse.data);
           }
         }
@@ -86,8 +88,7 @@ class RestructuredDatabaseSeeder {
       final payload = <String, dynamic>{
         'id': _readString(data, 'id') ?? doc.id,
         'name': name,
-        'shortName':
-            _readString(data, 'shortName') ?? _buildShortName(name),
+        'shortName': _readString(data, 'shortName') ?? _buildShortName(name),
         'slug': _readString(data, 'slug') ?? _slugify(name),
         'description': description,
         'shortDescription':
@@ -95,8 +96,7 @@ class RestructuredDatabaseSeeder {
             _buildShortDescription(description, name),
         'imageUrl': _readString(data, 'imageUrl') ?? '',
         'headName': _readString(data, 'headName') ?? '',
-        'headTitle':
-            _readString(data, 'headTitle') ?? 'Head of Department',
+        'headTitle': _readString(data, 'headTitle') ?? 'Head of Department',
         'headImageUrl': _readString(data, 'headImageUrl') ?? '',
         'headMessage': _readString(data, 'headMessage') ?? '',
         'contactEmail': _readString(data, 'contactEmail') ?? '',
@@ -133,13 +133,11 @@ class RestructuredDatabaseSeeder {
         'award': _readString(data, 'award') ?? _inferAward(name),
         'slug': _readString(data, 'slug') ?? _slugify(name),
         'summary':
-            _readString(data, 'summary') ??
-            'Learn more about $name at FAST.',
+            _readString(data, 'summary') ?? 'Learn more about $name at FAST.',
         'durationYears': _readInt(data, 'durationYears') ?? 4,
         'studyMode': _readString(data, 'studyMode') ?? 'full-time',
         'intake': _readStringList(data, 'intake'),
-        'entryRequirements':
-            _readString(data, 'entryRequirements') ?? '',
+        'entryRequirements': _readString(data, 'entryRequirements') ?? '',
         'careerPaths': _readStringList(data, 'careerPaths'),
         'brochureUrl': _readString(data, 'brochureUrl') ?? '',
         'featured': _readBool(data, 'featured') ?? order == 1,
@@ -220,8 +218,7 @@ class RestructuredDatabaseSeeder {
                 roleType == 'key_contact',
         'featured':
             _readBool(data, 'featured') ??
-            roleType == 'dean' ||
-                roleType == 'hod',
+            roleType == 'dean' || roleType == 'hod',
         'order': _readInt(data, 'order') ?? order,
         'status': _readString(data, 'status') ?? 'published',
         'createdAt': data['createdAt'] ?? Timestamp.fromDate(_now),
@@ -247,7 +244,9 @@ class RestructuredDatabaseSeeder {
 
     if (snapshot.docs.isEmpty) {
       if (!seedExamples) {
-        _log('No announcements found. Example announcement seeding is disabled.');
+        _log(
+          'No announcements found. Example announcement seeding is disabled.',
+        );
         return;
       }
 
@@ -273,9 +272,7 @@ class RestructuredDatabaseSeeder {
         'priority': _readString(data, 'priority') ?? 'normal',
         'isPinned': _readBool(data, 'isPinned') ?? false,
         'featured':
-            _readBool(data, 'featured') ??
-            _readBool(data, 'isPinned') ??
-            false,
+            _readBool(data, 'featured') ?? _readBool(data, 'isPinned') ?? false,
         'imageUrls': _readStringList(data, 'imageUrls'),
         'tags': _readStringList(data, 'tags'),
         'views': _readInt(data, 'views') ?? 0,
@@ -313,7 +310,8 @@ class RestructuredDatabaseSeeder {
 
   Future<void> _seedFacultyInfo() async {
     _log('Preparing faculty_info/fast...');
-    final departmentsSnapshot = await _firestore.collection('departments').get();
+    final departmentsSnapshot =
+        await _firestore.collection('departments').get();
     final staffSnapshot = await _firestore.collection('staff').get();
 
     var programCount = 0;
@@ -383,18 +381,9 @@ class RestructuredDatabaseSeeder {
       'vision': vision,
       'mission': mission,
       'stats': [
-        {
-          'label': 'Departments',
-          'value': departmentsSnapshot.docs.length,
-        },
-        {
-          'label': 'Programs',
-          'value': programCount,
-        },
-        {
-          'label': 'Staff',
-          'value': staffSnapshot.docs.length,
-        },
+        {'label': 'Departments', 'value': departmentsSnapshot.docs.length},
+        {'label': 'Programs', 'value': programCount},
+        {'label': 'Staff', 'value': staffSnapshot.docs.length},
       ],
       'deanId': _readString(data, 'deanId') ?? dean?.id ?? 'deans1',
       'deanName': deanName,
@@ -405,11 +394,7 @@ class RestructuredDatabaseSeeder {
       'websiteUrl': _readString(data, 'websiteUrl') ?? '',
       'socialLinks':
           _readMap(data, 'socialLinks') ??
-          <String, dynamic>{
-            'facebook': '',
-            'linkedin': '',
-            'youtube': '',
-          },
+          <String, dynamic>{'facebook': '', 'linkedin': '', 'youtube': ''},
       'createdAt': data['createdAt'] ?? Timestamp.fromDate(_now),
       'updatedAt': Timestamp.fromDate(_now),
       'dean_name': deanName,
@@ -418,17 +403,16 @@ class RestructuredDatabaseSeeder {
       'faculty_image_url': heroImageUrl,
       'faculty_vision': vision,
       'faculty_mission': mission,
-      'faculty_values':
-          _readStringList(
-            data,
-            'faculty_values',
-            fallback: const [
-              'Excellence in teaching and learning',
-              'Research and innovation',
-              'Integrity and accountability',
-              'Collaboration and community impact',
-            ],
-          ),
+      'faculty_values': _readStringList(
+        data,
+        'faculty_values',
+        fallback: const [
+          'Excellence in teaching and learning',
+          'Research and innovation',
+          'Integrity and accountability',
+          'Collaboration and community impact',
+        ],
+      ),
     };
 
     await _setDocument(facultyRef, payload);
@@ -467,48 +451,9 @@ class RestructuredDatabaseSeeder {
   }
 
   Future<void> _seedOrientationContent() async {
-    _log('Seeding orientation_content...');
-    final content = <FirestoreSeed>[
-      FirestoreSeed(
-        id: 'first-year-orientation-guide',
-        data: {
-          'title': 'First-Year Orientation Guide',
-          'slug': 'first-year-orientation-guide',
-          'category': 'orientation',
-          'summary':
-              'A practical starting point for new students joining FAST.',
-          'content':
-              'Use this guide to understand registration, academic expectations, support contacts, and life at FAST during your first weeks on campus.',
-          'audience': ['first-year', 'students'],
-          'order': 1,
-          'status': 'published',
-          'createdAt': Timestamp.fromDate(_now),
-          'updatedAt': Timestamp.fromDate(_now),
-        },
-      ),
-      FirestoreSeed(
-        id: 'student-success-basics',
-        data: {
-          'title': 'Student Success Basics',
-          'slug': 'student-success-basics',
-          'category': 'student-support',
-          'summary':
-              'Core academic and campus habits that help continuing and new students succeed.',
-          'content':
-              'Stay connected to updates, attend classes consistently, use support resources early, and build a relationship with your department and lecturers.',
-          'audience': ['students'],
-          'order': 2,
-          'status': 'published',
-          'createdAt': Timestamp.fromDate(_now),
-          'updatedAt': Timestamp.fromDate(_now),
-        },
-      ),
-    ];
-
-    final collection = _firestore.collection('orientation_content');
-    for (final item in content) {
-      await _setDocument(collection.doc(item.id), item.data);
-    }
+    _log(
+      'Skipping generic orientation_content seed. Add real entries from Admin Content Hub.',
+    );
   }
 
   Future<void> _seedSupportResources() async {
@@ -644,20 +589,17 @@ class RestructuredDatabaseSeeder {
       return const <Map<String, dynamic>>[];
     }
 
-    return rawCourses
-        .whereType<Map>()
-        .map((course) {
-          final typed = Map<String, dynamic>.from(course);
-          return <String, dynamic>{
-            'code': _readString(typed, 'code') ?? '',
-            'name': _readString(typed, 'name') ?? '',
-            'description': _readString(typed, 'description') ?? '',
-            'credits': _readInt(typed, 'credits') ?? 0,
-            if (typed.containsKey('semester'))
-              'semester': _readInt(typed, 'semester') ?? typed['semester'],
-          };
-        })
-        .toList();
+    return rawCourses.whereType<Map>().map((course) {
+      final typed = Map<String, dynamic>.from(course);
+      return <String, dynamic>{
+        'code': _readString(typed, 'code') ?? '',
+        'name': _readString(typed, 'name') ?? '',
+        'description': _readString(typed, 'description') ?? '',
+        'credits': _readInt(typed, 'credits') ?? 0,
+        if (typed.containsKey('semester'))
+          'semester': _readInt(typed, 'semester') ?? typed['semester'],
+      };
+    }).toList();
   }
 
   String _inferAnnouncementType(Map<String, dynamic> data) {
@@ -727,10 +669,8 @@ class RestructuredDatabaseSeeder {
   }
 
   String _buildShortName(String name) {
-    final words = name
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .toList();
+    final words =
+        name.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
 
     if (words.length == 1) {
       return words.first;
@@ -739,9 +679,7 @@ class RestructuredDatabaseSeeder {
     return words
         .where(
           (word) =>
-              word.length > 2 ||
-              word == words.first ||
-              word == words.last,
+              word.length > 2 || word == words.first || word == words.last,
         )
         .map((word) => word[0].toUpperCase())
         .join();
@@ -765,10 +703,7 @@ class RestructuredDatabaseSeeder {
     return normalized.replaceAll(RegExp(r'^-+|-+$'), '');
   }
 
-  Map<String, dynamic>? _readMap(
-    Map<String, dynamic> data,
-    String key,
-  ) {
+  Map<String, dynamic>? _readMap(Map<String, dynamic> data, String key) {
     final value = data[key];
     if (value is Map<String, dynamic>) {
       return value;
@@ -822,10 +757,11 @@ class RestructuredDatabaseSeeder {
       return List<String>.from(fallback);
     }
 
-    final items = value
-        .map((item) => item?.toString().trim() ?? '')
-        .where((item) => item.isNotEmpty)
-        .toList();
+    final items =
+        value
+            .map((item) => item?.toString().trim() ?? '')
+            .where((item) => item.isNotEmpty)
+            .toList();
 
     return items.isEmpty ? List<String>.from(fallback) : items;
   }
@@ -836,10 +772,7 @@ class RestructuredDatabaseSeeder {
 }
 
 class FirestoreSeed {
-  const FirestoreSeed({
-    required this.id,
-    required this.data,
-  });
+  const FirestoreSeed({required this.id, required this.data});
 
   final String id;
   final Map<String, dynamic> data;
@@ -1124,12 +1057,8 @@ List<FirestoreSeed> _sampleAnnouncements() {
         'audience': ['students'],
         'departmentIds': <String>[],
         'status': 'published',
-        'postedAt': Timestamp.fromDate(
-          now.subtract(const Duration(days: 2)),
-        ),
-        'createdAt': Timestamp.fromDate(
-          now.subtract(const Duration(days: 2)),
-        ),
+        'postedAt': Timestamp.fromDate(now.subtract(const Duration(days: 2))),
+        'createdAt': Timestamp.fromDate(now.subtract(const Duration(days: 2))),
         'updatedAt': Timestamp.fromDate(now),
       },
     ),

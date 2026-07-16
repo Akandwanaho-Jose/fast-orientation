@@ -20,25 +20,25 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.akandwanaho.fast"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = flutter.ndkVersion
     
     compileOptions {
         // Enable core library desugaring
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
     
     defaultConfig {
         applicationId = "com.akandwanaho.fast"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 4  // Explicitly set to version 3
-        versionName = "1.0.3"  // Explicitly set version name
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
     
     // Add packaging options to avoid conflicts

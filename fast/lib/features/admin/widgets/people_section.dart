@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fast/core/utils/constants.dart';
+import 'package:fast/core/widgets/safe_network_avatar.dart';
 import 'package:fast/features/Staff/models/staff.dart';
 import 'package:fast/features/admin/widgets/admin_shared.dart';
+import 'package:fast/features/departments/models/department.dart';
 import 'package:flutter/material.dart';
 
 class PeopleAdminSection extends StatelessWidget {
@@ -41,14 +43,11 @@ class PeopleAdminSection extends StatelessWidget {
           subtitle:
               'Manage the dean, heads of department, key contacts, and the wider staff directory.',
           actions: [
-            ElevatedButton.icon(
+            AdminPrimaryActionButton(
               onPressed: () => _showEditDialog(context),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('New Profile'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: mustBlue,
-                foregroundColor: Colors.white,
-              ),
+              icon: Icons.add_rounded,
+              label: 'New Profile',
+              compactLabel: 'New',
             ),
           ],
           child:
@@ -88,6 +87,21 @@ class PeopleAdminSection extends StatelessWidget {
   }
 
   Future<void> _showEditDialog(BuildContext context, {Staff? existing}) async {
+    final formKey = GlobalKey<FormState>();
+    final departmentOptions = await _loadDepartmentOptions(existing);
+    if (!context.mounted) {
+      return;
+    }
+    final existingDepartment =
+        (existing?.departmentName ?? existing?.department ?? '').trim();
+    var selectedDepartmentName = _initialDepartmentName(
+      departmentOptions,
+      existingDepartment,
+    );
+    var selectedDepartmentId = _departmentIdFor(
+      departmentOptions,
+      selectedDepartmentName,
+    );
     final nameController = TextEditingController(text: existing?.name ?? '');
     final positionController = TextEditingController(
       text: existing?.position ?? '',
@@ -104,7 +118,7 @@ class PeopleAdminSection extends StatelessWidget {
       text: existing?.photoUrl ?? '',
     );
     final departmentNameController = TextEditingController(
-      text: existing?.departmentName ?? existing?.department ?? '',
+      text: selectedDepartmentName ?? '',
     );
     final bioController = TextEditingController(text: existing?.bio ?? '');
     final orderController = TextEditingController(
@@ -133,77 +147,101 @@ class PeopleAdminSection extends StatelessWidget {
               content: SizedBox(
                 width: 760,
                 child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _field(nameController, 'Name'),
-                      _field(positionController, 'Position'),
-                      _field(departmentNameController, 'Department name'),
-                      DropdownButtonFormField<String>(
-                        value: roleType,
-                        decoration: _decoration('Role type'),
-                        items: const [
-                          DropdownMenuItem(value: 'dean', child: Text('Dean')),
-                          DropdownMenuItem(value: 'hod', child: Text('HOD')),
-                          DropdownMenuItem(
-                            value: 'key_contact',
-                            child: Text('Key Contact'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'staff',
-                            child: Text('Staff'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) setState(() => roleType = value);
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: status,
-                        decoration: _decoration('Status'),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'published',
-                            child: Text('Published'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'draft',
-                            child: Text('Draft'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) setState(() => status = value);
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _field(emailController, 'Email'),
-                      _field(phoneController, 'Phone'),
-                      _field(officeController, 'Office'),
-                      _field(linkedinController, 'LinkedIn URL'),
-                      _field(photoController, 'Photo URL'),
-                      _field(bioController, 'Bio', maxLines: 4),
-                      _field(orderController, 'Display order'),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: featured,
-                        onChanged: (value) => setState(() => featured = value),
-                        title: const Text('Featured'),
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: isKeyContact,
-                        onChanged:
-                            (value) => setState(() => isKeyContact = value),
-                        title: const Text('Key contact'),
-                      ),
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        value: isLeadership,
-                        onChanged:
-                            (value) => setState(() => isLeadership = value),
-                        title: const Text('Leadership'),
-                      ),
-                    ],
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      children: [
+                        _field(nameController, 'Name'),
+                        _field(positionController, 'Position'),
+                        _departmentField(
+                          controller: departmentNameController,
+                          options: departmentOptions,
+                          selectedDepartmentName: selectedDepartmentName,
+                          onChanged: (value) {
+                            setState(() {
+                              selectedDepartmentName = value;
+                              selectedDepartmentId = _departmentIdFor(
+                                departmentOptions,
+                                value,
+                              );
+                              departmentNameController.text = value ?? '';
+                            });
+                          },
+                        ),
+                        DropdownButtonFormField<String>(
+                          initialValue: roleType,
+                          decoration: _decoration('Role type'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'dean',
+                              child: Text('Dean'),
+                            ),
+                            DropdownMenuItem(value: 'hod', child: Text('HOD')),
+                            DropdownMenuItem(
+                              value: 'key_contact',
+                              child: Text('Key Contact'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'staff',
+                              child: Text('Staff'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setState(() => roleType = value);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: status,
+                          decoration: _decoration('Status'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'published',
+                              child: Text('Published'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'draft',
+                              child: Text('Draft'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setState(() => status = value);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _field(emailController, 'Email'),
+                        _field(phoneController, 'Phone'),
+                        _field(officeController, 'Office'),
+                        _field(linkedinController, 'LinkedIn URL'),
+                        AdminImageUrlField(
+                          controller: photoController,
+                          label: 'Profile photo',
+                        ),
+                        _field(bioController, 'Bio', maxLines: 4),
+                        _field(orderController, 'Display order'),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: featured,
+                          onChanged:
+                              (value) => setState(() => featured = value),
+                          title: const Text('Featured'),
+                        ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: isKeyContact,
+                          onChanged:
+                              (value) => setState(() => isKeyContact = value),
+                          title: const Text('Key contact'),
+                        ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: isLeadership,
+                          onChanged:
+                              (value) => setState(() => isLeadership = value),
+                          title: const Text('Leadership'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -214,6 +252,10 @@ class PeopleAdminSection extends StatelessWidget {
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    if (!(formKey.currentState?.validate() ?? false)) {
+                      return;
+                    }
+                    final departmentName = departmentNameController.text.trim();
                     final collection = FirebaseFirestore.instance.collection(
                       'staff',
                     );
@@ -224,8 +266,10 @@ class PeopleAdminSection extends StatelessWidget {
                     await doc.set({
                       'name': nameController.text.trim(),
                       'position': positionController.text.trim(),
-                      'department': departmentNameController.text.trim(),
-                      'departmentName': departmentNameController.text.trim(),
+                      'department': departmentName,
+                      'departmentName': departmentName,
+                      'departmentId':
+                          selectedDepartmentId ?? FieldValue.delete(),
                       'roleType': roleType,
                       'email': emailController.text.trim(),
                       'phone': phoneController.text.trim(),
@@ -259,6 +303,135 @@ class PeopleAdminSection extends StatelessWidget {
     );
   }
 
+  Future<List<_DepartmentOption>> _loadDepartmentOptions(
+    Staff? existing,
+  ) async {
+    final existingDepartment =
+        (existing?.departmentName ?? existing?.department ?? '').trim();
+
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('departments').get();
+      final options = snapshot.docs
+          .map((doc) {
+            final department = Department.fromJson({
+              ...doc.data(),
+              'id': doc.id,
+            }, const []);
+            return _DepartmentOption(
+              id: doc.id,
+              name: department.name,
+              shortName: department.shortName,
+            );
+          })
+          .toList(growable: true);
+
+      options.sort((a, b) => a.name.compareTo(b.name));
+
+      if (existingDepartment.isNotEmpty &&
+          !options.any(
+            (option) =>
+                _normalizeDepartment(option.name) ==
+                _normalizeDepartment(existingDepartment),
+          )) {
+        options.insert(
+          0,
+          _DepartmentOption(
+            id: null,
+            name: existingDepartment,
+            shortName: Staff.departmentCodeFor(existingDepartment),
+          ),
+        );
+      }
+
+      return options;
+    } catch (_) {
+      if (existingDepartment.isEmpty) {
+        return const [];
+      }
+
+      return [
+        _DepartmentOption(
+          id: null,
+          name: existingDepartment,
+          shortName: Staff.departmentCodeFor(existingDepartment),
+        ),
+      ];
+    }
+  }
+
+  String? _departmentIdFor(List<_DepartmentOption> options, String? name) {
+    if (name == null || name.trim().isEmpty) {
+      return null;
+    }
+
+    final normalizedName = _normalizeDepartment(name);
+    for (final option in options) {
+      if (_normalizeDepartment(option.name) == normalizedName) {
+        return option.id;
+      }
+    }
+    return null;
+  }
+
+  String? _initialDepartmentName(
+    List<_DepartmentOption> options,
+    String existingDepartment,
+  ) {
+    if (existingDepartment.isEmpty) {
+      return options.isNotEmpty ? options.first.name : null;
+    }
+
+    for (final option in options) {
+      if (option.name == existingDepartment) {
+        return option.name;
+      }
+    }
+
+    final normalizedExisting = _normalizeDepartment(existingDepartment);
+    for (final option in options) {
+      if (_normalizeDepartment(option.name) == normalizedExisting) {
+        return option.name;
+      }
+    }
+
+    return existingDepartment;
+  }
+
+  Widget _departmentField({
+    required TextEditingController controller,
+    required List<_DepartmentOption> options,
+    required String? selectedDepartmentName,
+    required ValueChanged<String?> onChanged,
+  }) {
+    if (options.isEmpty) {
+      return _field(
+        controller,
+        'Department name',
+        validator: _requiredDepartment,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DropdownButtonFormField<String>(
+        initialValue: selectedDepartmentName,
+        decoration: _decoration('Department'),
+        isExpanded: true,
+        items: options
+            .map(
+              (option) => DropdownMenuItem(
+                value: option.name,
+                child: Text('${option.shortName} - ${option.name}'),
+              ),
+            )
+            .toList(growable: false),
+        validator: _requiredDepartment,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
   InputDecoration _decoration(String label) {
     return InputDecoration(
       labelText: label,
@@ -270,15 +443,28 @@ class PeopleAdminSection extends StatelessWidget {
     TextEditingController controller,
     String label, {
     int maxLines = 1,
+    String? Function(String?)? validator,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
         maxLines: maxLines,
         decoration: _decoration(label),
+        validator: validator,
       ),
     );
+  }
+
+  String? _requiredDepartment(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Select the person\'s department.';
+    }
+    return null;
+  }
+
+  String _normalizeDepartment(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
   }
 
   Future<void> _confirmDelete(
@@ -319,6 +505,18 @@ class PeopleAdminSection extends StatelessWidget {
   }
 }
 
+class _DepartmentOption {
+  const _DepartmentOption({
+    required this.id,
+    required this.name,
+    required this.shortName,
+  });
+
+  final String? id;
+  final String name;
+  final String shortName;
+}
+
 class _PersonAdminCard extends StatelessWidget {
   const _PersonAdminCard({
     required this.person,
@@ -336,19 +534,12 @@ class _PersonAdminCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
+          SafeNetworkAvatar(
             radius: 30,
+            imageUrl: person.photoUrl,
             backgroundColor: const Color(0xFFEAF1FB),
-            backgroundImage:
-                person.hasPhoto ? NetworkImage(person.photoUrl!) : null,
-            child:
-                person.hasPhoto
-                    ? null
-                    : const Icon(
-                      Icons.person_rounded,
-                      color: mustBlue,
-                      size: 30,
-                    ),
+            fallbackIconColor: mustBlue,
+            fallbackIconSize: 30,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -371,6 +562,11 @@ class _PersonAdminCard extends StatelessWidget {
                       const AdminTag(
                         label: 'Key Contact',
                         color: Color(0xFFD97706),
+                      ),
+                    if (!person.hasDepartment)
+                      const AdminTag(
+                        label: 'Missing department',
+                        color: Colors.red,
                       ),
                   ],
                 ),
@@ -399,20 +595,8 @@ class _PersonAdminCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Column(
-            children: [
-              IconButton(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded),
-              ),
-              IconButton(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: Colors.red,
-              ),
-            ],
-          ),
+          const SizedBox(width: 8),
+          AdminOverflowActions(onEdit: onEdit, onDelete: onDelete),
         ],
       ),
     );

@@ -38,14 +38,11 @@ class _FacultyProfileSectionState extends State<FacultyProfileSection> {
           subtitle:
               'Manage the core FAST branding, hero content, dean spotlight, and official contact details.',
           actions: [
-            ElevatedButton.icon(
+            AdminPrimaryActionButton(
               onPressed: () => _showEditDialog(data),
-              icon: const Icon(Icons.edit_rounded),
-              label: const Text('Edit Profile'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: mustBlue,
-                foregroundColor: Colors.white,
-              ),
+              icon: Icons.edit_rounded,
+              label: 'Edit Profile',
+              compactLabel: 'Edit',
             ),
           ],
           child: Column(
@@ -406,13 +403,19 @@ class _FacultyProfileSectionState extends State<FacultyProfileSection> {
                   _field(shortNameController, 'Short name'),
                   _field(heroTitleController, 'Hero title'),
                   _field(heroSubtitleController, 'Hero subtitle', maxLines: 3),
-                  _field(heroImageController, 'Hero image URL'),
+                  AdminImageUrlField(
+                    controller: heroImageController,
+                    label: 'Hero image',
+                  ),
                   _field(overviewController, 'Overview', maxLines: 4),
                   _field(visionController, 'Vision', maxLines: 4),
                   _field(missionController, 'Mission', maxLines: 4),
                   _field(deanNameController, 'Dean name'),
                   _field(deanMessageController, 'Dean message', maxLines: 4),
-                  _field(deanPhotoController, 'Dean photo URL'),
+                  AdminImageUrlField(
+                    controller: deanPhotoController,
+                    label: 'Dean photo',
+                  ),
                   _field(emailController, 'Contact email'),
                   _field(phoneController, 'Contact phone'),
                   _field(websiteController, 'Website URL'),
@@ -478,19 +481,57 @@ class _FacultyProfileSectionState extends State<FacultyProfileSection> {
 
   Future<List<Map<String, dynamic>>> _buildStats() async {
     final firestore = FirebaseFirestore.instance;
-    final departments = await firestore.collection('departments').count().get();
-    final staff = await firestore.collection('staff').count().get();
+    final departmentsSnapshot = await firestore.collection('departments').get();
+    final publishedDepartments = departmentsSnapshot.docs
+        .where((doc) {
+          return readString(doc.data(), 'status', 'published') == 'published';
+        })
+        .toList(growable: false);
+    final staff =
+        await firestore
+            .collection('staff')
+            .where('status', isEqualTo: 'published')
+            .count()
+            .get();
     final programDepartments = await firestore.collection('departments').get();
-    var programCount = 0;
+    final programKeys = <String>{};
     for (final doc in programDepartments.docs) {
-      final programs = await doc.reference.collection('programs').count().get();
-      programCount += programs.count ?? 0;
+      final programs = await doc.reference.collection('programs').get();
+      for (final programDoc in programs.docs) {
+        final data = programDoc.data();
+        if (readString(data, 'status', 'draft') != 'published') {
+          continue;
+        }
+        final slug = readString(data, 'slug', programDoc.id);
+        final name = readString(data, 'name', slug);
+        programKeys.add(_programStatKey(slug: slug, name: name));
+      }
     }
     return [
-      {'label': 'Departments', 'value': departments.count ?? 0},
-      {'label': 'Programs', 'value': programCount},
+      {'label': 'Departments', 'value': publishedDepartments.length},
+      {'label': 'Programs', 'value': programKeys.length},
       {'label': 'Staff', 'value': staff.count ?? 0},
     ];
+  }
+
+  String _programStatKey({required String slug, required String name}) {
+    final normalizedName =
+        name
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+    if (normalizedName.isNotEmpty) {
+      return 'name:$normalizedName';
+    }
+
+    final normalizedSlug = slug.trim().toLowerCase();
+    if (normalizedSlug.isNotEmpty) {
+      return 'slug:$normalizedSlug';
+    }
+
+    return 'program:unknown';
   }
 
   Widget _field(

@@ -1,19 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:fast/core/services/auth_service.dart';
 import 'package:fast/core/theme/fast_brand.dart';
 import 'package:fast/core/utils/constants.dart';
 import 'package:fast/core/widgets/safe_network_avatar.dart';
 import 'package:fast/core/widgets/safe_remote_image.dart';
 import 'package:fast/features/annoucements/models/announcement.dart';
 import 'package:fast/features/annoucements/screens/annoucement_details_screen.dart';
-import 'package:fast/features/auth/screens/login_screen.dart';
 import 'package:fast/features/explore/screens/explore_fast_screen.dart';
-import 'package:fast/features/more/screens/more_screen.dart';
+import 'package:fast/features/orientation/screens/orientation_screen.dart';
 import 'package:fast/features/people/screens/people_screen.dart';
 import 'package:fast/features/quick_links/widgets/quick_links_grid.dart';
 import 'package:fast/features/updates/screens/updates_screen.dart';
+import 'package:fast/features/updates/widgets/update_share_sheet.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,23 +23,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  bool _isLoggingOut = false;
 
-  List<Widget> _screens(bool isAuthenticated) {
+  List<Widget> _screens() {
     return [
       _FastHomeTab(
         onExplore: () => _selectIndex(1),
         onUpdates: () => _selectIndex(2),
         onPeople: () => _selectIndex(3),
+        onOrientation: () => _selectIndex(4),
       ),
       const ExploreFastScreen(),
       const UpdatesScreen(),
       const PeopleScreen(),
-      MoreScreen(
-        isAuthenticated: isAuthenticated,
-        onOpenAdmin: _openAdminLogin,
-        onLogout: _logout,
-      ),
+      const OrientationScreen(),
     ];
   }
 
@@ -50,60 +45,21 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _openAdminLogin() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const LoginScreen()));
-  }
-
-  Future<void> _logout() async {
-    setState(() {
-      _isLoggingOut = true;
-    });
-
-    try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      await authService.signOut();
-      if (!mounted) {
-        return;
-      }
-
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-        (route) => false,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoggingOut = false;
-        });
-      }
-    }
+  void _openDeveloperAdminRoute() {
+    Navigator.of(context).pushNamed('/admin');
   }
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final isAuthenticated = authService.isLoggedIn;
-    final screens = _screens(isAuthenticated);
+    final screens = _screens();
 
     return Scaffold(
       backgroundColor: FastBrand.shellBackground,
-      appBar: _ShellAppBar(title: _titleForIndex(_selectedIndex)),
-      body: Stack(
-        children: [
-          IndexedStack(index: _selectedIndex, children: screens),
-          if (_isLoggingOut)
-            Positioned.fill(
-              child: Container(
-                color: Colors.white.withValues(alpha: 0.78),
-                child: const Center(
-                  child: CircularProgressIndicator(color: mustBlue),
-                ),
-              ),
-            ),
-        ],
+      appBar: _ShellAppBar(
+        title: _titleForIndex(_selectedIndex),
+        onDeveloperAdminAccess: kDebugMode ? _openDeveloperAdminRoute : null,
       ),
+      body: IndexedStack(index: _selectedIndex, children: screens),
       bottomNavigationBar: _ShellNavigationBar(
         selectedIndex: _selectedIndex,
         onSelected: _selectIndex,
@@ -120,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return 'People';
       case 4:
-        return 'More';
+        return 'Orientation';
       default:
         return 'Home';
     }
@@ -132,11 +88,13 @@ class _FastHomeTab extends StatefulWidget {
     required this.onExplore,
     required this.onUpdates,
     required this.onPeople,
+    required this.onOrientation,
   });
 
   final VoidCallback onExplore;
   final VoidCallback onUpdates;
   final VoidCallback onPeople;
+  final VoidCallback onOrientation;
 
   @override
   State<_FastHomeTab> createState() => _FastHomeTabState();
@@ -193,13 +151,79 @@ class _FastHomeTabState extends State<_FastHomeTab> {
         .toList(growable: false);
 
     final deanProfile = await _resolveDeanProfile(facultyInfo, firestore);
+    final stats = await _loadLiveStats(firestore);
 
     return _HomeData(
       facultyInfo: facultyInfo,
       featuredStory: stories.isEmpty ? null : stories.first,
       announcements: announcements,
       deanProfile: deanProfile,
+      stats: stats,
     );
+  }
+
+  Future<List<_StatItem>> _loadLiveStats(FirebaseFirestore firestore) async {
+    final departmentsSnapshot = await firestore.collection('departments').get();
+    final publishedDepartments = departmentsSnapshot.docs
+        .where((doc) {
+          return _readString(doc.data(), 'status', 'published') == 'published';
+        })
+        .toList(growable: false);
+
+    final programKeys = <String>{};
+    for (final department in publishedDepartments) {
+      final programsSnapshot =
+          await department.reference.collection('programs').get();
+      for (final programDoc in programsSnapshot.docs) {
+        final data = programDoc.data();
+        if (_readString(data, 'status', 'draft') != 'published') {
+          continue;
+        }
+        final slug = _readString(data, 'slug', programDoc.id);
+        final name = _readString(data, 'name', slug);
+        programKeys.add(_programStatKey(slug: slug, name: name));
+      }
+    }
+
+    final staffCount =
+        await firestore
+            .collection('staff')
+            .where('status', isEqualTo: 'published')
+            .count()
+            .get();
+    final updateCount =
+        await firestore
+            .collection('announcements')
+            .where('status', isEqualTo: 'published')
+            .count()
+            .get();
+
+    return [
+      _StatItem(label: 'Departments', value: '${publishedDepartments.length}'),
+      _StatItem(label: 'Programs', value: '${programKeys.length}'),
+      _StatItem(label: 'Staff', value: '${staffCount.count ?? 0}'),
+      _StatItem(label: 'Updates', value: '${updateCount.count ?? 0}'),
+    ];
+  }
+
+  String _programStatKey({required String slug, required String name}) {
+    final normalizedName =
+        name
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+    if (normalizedName.isNotEmpty) {
+      return 'name:$normalizedName';
+    }
+
+    final normalizedSlug = slug.trim().toLowerCase();
+    if (normalizedSlug.isNotEmpty) {
+      return 'slug:$normalizedSlug';
+    }
+
+    return 'program:unknown';
   }
 
   Future<_DeanProfile> _resolveDeanProfile(
@@ -296,19 +320,25 @@ class _FastHomeTabState extends State<_FastHomeTab> {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
             children: [
               _buildHero(data),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               _buildStats(data),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+              _buildExploreFastSection(),
+              const SizedBox(height: 20),
               if (data.featuredStory != null)
                 _buildFeaturedStory(data.featuredStory!),
-              if (data.featuredStory != null) const SizedBox(height: 16),
+              if (data.featuredStory != null) const SizedBox(height: 20),
               const QuickLinksGrid(
                 title: 'Quick Links',
                 subtitle: 'Verified student systems and support tools.',
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               _buildLatestUpdates(data.announcements),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+              _buildUpcomingEvents(data.announcements),
+              const SizedBox(height: 20),
+              _buildResearchSpotlight(data.announcements),
+              const SizedBox(height: 20),
               _buildDeanSpotlight(data.deanProfile),
             ],
           ),
@@ -329,6 +359,7 @@ class _FastHomeTabState extends State<_FastHomeTab> {
         _readOptionalString(facultyInfo, 'faculty_image_url');
 
     return Container(
+      width: double.infinity,
       decoration: FastBrand.heroDecoration(),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -443,7 +474,8 @@ class _FastHomeTabState extends State<_FastHomeTab> {
   }
 
   Widget _buildStats(_HomeData data) {
-    final stats = _extractStats(data.facultyInfo);
+    final stats =
+        data.stats.isNotEmpty ? data.stats : _extractStats(data.facultyInfo);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -563,6 +595,76 @@ class _FastHomeTabState extends State<_FastHomeTab> {
     );
   }
 
+  Widget _buildExploreFastSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: FastBrand.surfaceDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Explore FAST',
+            style: TextStyle(
+              color: FastBrand.primary,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Start with the main public areas students, staff, alumni, and visitors need most.',
+            style: TextStyle(color: FastBrand.mutedText, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 430;
+              final items = [
+                _HomeAccessItem(
+                  icon: Icons.account_balance_rounded,
+                  label: 'Departments',
+                  color: FastBrand.primary,
+                  onTap: widget.onExplore,
+                ),
+                _HomeAccessItem(
+                  icon: Icons.school_rounded,
+                  label: 'Programmes',
+                  color: FastBrand.secondary,
+                  onTap: widget.onExplore,
+                ),
+                _HomeAccessItem(
+                  icon: Icons.campaign_rounded,
+                  label: 'Updates',
+                  color: FastBrand.warning,
+                  onTap: widget.onUpdates,
+                ),
+                _HomeAccessItem(
+                  icon: Icons.menu_book_rounded,
+                  label: 'Orientation',
+                  color: FastBrand.primaryStrong,
+                  onTap: widget.onOrientation,
+                ),
+              ];
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: compact ? 2 : 4,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  mainAxisExtent: 118,
+                ),
+                itemBuilder: (context, index) => items[index],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLatestUpdates(List<Announcement> announcements) {
     final visible = announcements.take(4).toList(growable: false);
 
@@ -585,7 +687,7 @@ class _FastHomeTabState extends State<_FastHomeTab> {
             'Recent notices and deadlines from the FAST updates stream.',
             style: const TextStyle(color: FastBrand.mutedText, height: 1.5),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           if (visible.isEmpty)
             Text(
               'No updates are published yet.',
@@ -610,53 +712,98 @@ class _FastHomeTabState extends State<_FastHomeTab> {
                       );
                     },
                     child: Ink(
-                      padding: const EdgeInsets.all(16),
                       decoration: FastBrand.mutedSurfaceDecoration(radius: 20),
-                      child: Row(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: FastBrand.tintDecoration(
-                              FastBrand.primary,
-                              radius: 14,
+                          ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20),
                             ),
-                            child: const Icon(
-                              Icons.campaign_rounded,
-                              color: FastBrand.primary,
-                            ),
+                            child: _HomeUpdateImage(announcement: announcement),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
+                          Padding(
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                _HomeUpdateBadge(
+                                  label: announcement.displayType,
+                                  color: FastBrand.primary,
+                                ),
+                                const SizedBox(height: 10),
                                 Text(
                                   announcement.title,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     color: FastBrand.headingText,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.25,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  announcement.displayType,
+                                  announcement.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: FastBrand.mutedText,
-                                    fontWeight: FontWeight.w600,
+                                    color: FastBrand.supportText,
+                                    height: 1.45,
                                   ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.schedule_rounded,
+                                      size: 15,
+                                      color: FastBrand.mutedText,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        _relativeHomeDate(
+                                          announcement.postedAt,
+                                        ),
+                                        style: const TextStyle(
+                                          color: FastBrand.mutedText,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder:
+                                                (_) =>
+                                                    AnnouncementDetailsScreen(
+                                                      announcement:
+                                                          announcement,
+                                                    ),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text('Read More'),
+                                    ),
+                                    IconButton(
+                                      onPressed:
+                                          () => showUpdateShareSheet(
+                                            context,
+                                            announcement,
+                                          ),
+                                      tooltip: 'Share update',
+                                      icon: const Icon(
+                                        Icons.ios_share_rounded,
+                                        color: FastBrand.primary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 16,
-                            color: FastBrand.primary,
                           ),
                         ],
                       ),
@@ -668,6 +815,56 @@ class _FastHomeTabState extends State<_FastHomeTab> {
         ],
       ),
     );
+  }
+
+  Widget _buildUpcomingEvents(List<Announcement> announcements) {
+    final events = announcements
+        .where((announcement) => announcement.type == 'event')
+        .take(3)
+        .toList(growable: false);
+    if (events.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return _HomeCompactUpdateSection(
+      title: 'Upcoming Events',
+      subtitle:
+          'Events and activities recently published for the FAST community.',
+      announcements: events,
+      icon: Icons.event_rounded,
+      accent: FastBrand.secondary,
+    );
+  }
+
+  Widget _buildResearchSpotlight(List<Announcement> announcements) {
+    final spotlight = announcements
+        .where(_isResearchOrInnovationUpdate)
+        .take(3)
+        .toList(growable: false);
+    if (spotlight.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return _HomeCompactUpdateSection(
+      title: 'Innovation and Research Spotlight',
+      subtitle:
+          'Research, innovation, and project stories that show FAST in action.',
+      announcements: spotlight,
+      icon: Icons.lightbulb_rounded,
+      accent: const Color(0xFF5B5FC7),
+    );
+  }
+
+  bool _isResearchOrInnovationUpdate(Announcement announcement) {
+    final text =
+        [
+          announcement.displayCategory,
+          announcement.displayType,
+          announcement.title,
+          ...announcement.tags,
+        ].join(' ').toLowerCase();
+    return text.contains('research') ||
+        text.contains('innovation') ||
+        text.contains('project') ||
+        text.contains('lab');
   }
 
   Widget _buildDeanSpotlight(_DeanProfile deanProfile) {
@@ -765,10 +962,296 @@ class _FastHomeTabState extends State<_FastHomeTab> {
   }
 }
 
-class _ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _ShellAppBar({required this.title});
+class _HomeAccessItem extends StatelessWidget {
+  const _HomeAccessItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: FastBrand.tintDecoration(color, radius: 14),
+                child: Icon(icon, color: color),
+              ),
+              const Spacer(),
+              Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: FastBrand.headingText,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeUpdateImage extends StatelessWidget {
+  const _HomeUpdateImage({required this.announcement});
+
+  final Announcement announcement;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 142,
+      width: double.infinity,
+      child: SafeRemoteImage(
+        imageUrl: announcement.mainImageUrl,
+        fit: BoxFit.cover,
+        fallback: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                FastBrand.primary.withValues(alpha: 0.94),
+                FastBrand.primaryStrong.withValues(alpha: 0.84),
+                _accentColor().withValues(alpha: 0.78),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Icon(_icon(), color: Colors.white, size: 30),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _icon() {
+    switch (announcement.type) {
+      case 'event':
+        return Icons.event_rounded;
+      case 'deadline':
+        return Icons.schedule_rounded;
+      case 'opportunity':
+        return Icons.star_rounded;
+      default:
+        return Icons.campaign_rounded;
+    }
+  }
+
+  Color _accentColor() {
+    switch (announcement.type) {
+      case 'event':
+        return FastBrand.secondary;
+      case 'deadline':
+        return FastBrand.danger;
+      case 'opportunity':
+        return FastBrand.warning;
+      default:
+        return FastBrand.primaryStrong;
+    }
+  }
+}
+
+class _HomeUpdateBadge extends StatelessWidget {
+  const _HomeUpdateBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: FastBrand.solidPillDecoration(color, opacity: 0.09),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeCompactUpdateSection extends StatelessWidget {
+  const _HomeCompactUpdateSection({
+    required this.title,
+    required this.subtitle,
+    required this.announcements,
+    required this.icon,
+    required this.accent,
+  });
 
   final String title;
+  final String subtitle;
+  final List<Announcement> announcements;
+  final IconData icon;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: FastBrand.surfaceDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: FastBrand.tintDecoration(accent, radius: 14),
+                child: Icon(icon, color: accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: FastBrand.primary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: FastBrand.mutedText,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...announcements.map(
+            (announcement) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: FastBrand.softSurface,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder:
+                            (_) => AnnouncementDetailsScreen(
+                              announcement: announcement,
+                            ),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                announcement.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: FastBrand.headingText,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _relativeHomeDate(announcement.postedAt),
+                                style: const TextStyle(
+                                  color: FastBrand.mutedText,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed:
+                              () => showUpdateShareSheet(context, announcement),
+                          tooltip: 'Share update',
+                          icon: const Icon(
+                            Icons.ios_share_rounded,
+                            color: FastBrand.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _relativeHomeDate(DateTime date) {
+  final now = DateTime.now();
+  final difference = now.difference(date);
+  if (difference.inMinutes < 1) {
+    return 'Just now';
+  }
+  if (difference.inHours < 24) {
+    return difference.inHours == 0
+        ? '${difference.inMinutes}m ago'
+        : '${difference.inHours}h ago';
+  }
+  if (difference.inDays == 1) {
+    return 'Yesterday';
+  }
+  if (difference.inDays < 7) {
+    return '${difference.inDays} days ago';
+  }
+  return '${date.day}/${date.month}/${date.year}';
+}
+
+class _ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _ShellAppBar({required this.title, this.onDeveloperAdminAccess});
+
+  final String title;
+  final VoidCallback? onDeveloperAdminAccess;
 
   @override
   Size get preferredSize => const Size.fromHeight(74);
@@ -780,42 +1263,45 @@ class _ShellAppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
       titleSpacing: 20,
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: FastBrand.logoSurface,
-              borderRadius: BorderRadius.circular(14),
+      title: GestureDetector(
+        onLongPress: onDeveloperAdminAccess,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: FastBrand.logoSurface,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Image.asset('assets/images/MUST_LOGO.png', height: 28),
             ),
-            child: Image.asset('assets/images/MUST_LOGO.png', height: 28),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  FastBrand.shortName,
-                  style: TextStyle(
-                    color: FastBrand.primary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    FastBrand.shortName,
+                    style: TextStyle(
+                      color: FastBrand.primary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: FastBrand.mutedText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: FastBrand.mutedText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -861,10 +1347,10 @@ class _ShellNavigationBar extends StatelessWidget {
       accentColor: FastBrand.primary,
     ),
     _ShellNavItemData(
-      label: 'More',
-      compactLabel: 'More',
-      icon: Icons.grid_view_outlined,
-      selectedIcon: Icons.grid_view_rounded,
+      label: 'Orientation',
+      compactLabel: 'Orient',
+      icon: Icons.menu_book_outlined,
+      selectedIcon: Icons.menu_book_rounded,
       color: FastBrand.primary,
       accentColor: FastBrand.secondary,
     ),
@@ -1029,6 +1515,7 @@ class _HomeData {
     required this.featuredStory,
     required this.announcements,
     required this.deanProfile,
+    required this.stats,
   });
 
   factory _HomeData.empty() {
@@ -1037,6 +1524,7 @@ class _HomeData {
       featuredStory: null,
       announcements: <Announcement>[],
       deanProfile: _DeanProfile.empty(),
+      stats: <_StatItem>[],
     );
   }
 
@@ -1044,6 +1532,7 @@ class _HomeData {
   final _FeaturedStory? featuredStory;
   final List<Announcement> announcements;
   final _DeanProfile deanProfile;
+  final List<_StatItem> stats;
 }
 
 class _DeanProfile {

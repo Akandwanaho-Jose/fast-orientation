@@ -4,8 +4,9 @@ import 'package:fast/features/admin/widgets/departments_section.dart';
 import 'package:fast/features/admin/widgets/faculty_profile_section.dart';
 import 'package:fast/features/admin/widgets/overview_section.dart';
 import 'package:fast/features/admin/widgets/people_section.dart';
+import 'package:fast/features/admin/widgets/programs_section.dart';
 import 'package:fast/features/admin/widgets/updates_section.dart';
-import 'package:fast/features/home/screens/home_screen.dart';
+import 'package:fast/features/auth/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -39,6 +40,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       screen: DepartmentsAdminSection(),
     ),
     _AdminDestination(
+      label: 'Programs',
+      icon: Icons.school_outlined,
+      selectedIcon: Icons.school_rounded,
+      screen: ProgramsAdminSection(),
+    ),
+    _AdminDestination(
       label: 'Updates',
       icon: Icons.campaign_outlined,
       selectedIcon: Icons.campaign_rounded,
@@ -67,28 +74,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return Scaffold(
           backgroundColor: const Color(0xFFF4F7FB),
           appBar: _buildAppBar(),
-          body: wide
-              ? Row(
-                  children: [
-                    _buildRail(),
-                    const VerticalDivider(width: 1),
-                    Expanded(
-                      child: IndexedStack(
-                        index: _selectedIndex,
-                        children: _destinations
-                            .map((d) => d.screen)
-                            .toList(growable: false),
+          drawer: wide ? null : _buildDrawer(),
+          body:
+              wide
+                  ? Row(
+                    children: [
+                      _buildRail(),
+                      const VerticalDivider(width: 1),
+                      Expanded(
+                        child: IndexedStack(
+                          index: _selectedIndex,
+                          children: _destinations
+                              .map((d) => d.screen)
+                              .toList(growable: false),
+                        ),
                       ),
-                    ),
-                  ],
-                )
-              : IndexedStack(
-                  index: _selectedIndex,
-                  children: _destinations
-                      .map((d) => d.screen)
-                      .toList(growable: false),
-                ),
-          bottomNavigationBar: wide ? null : _buildBottomNav(),
+                    ],
+                  )
+                  : IndexedStack(
+                    index: _selectedIndex,
+                    children: _destinations
+                        .map((d) => d.screen)
+                        .toList(growable: false),
+                  ),
         );
       },
     );
@@ -137,16 +145,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: OutlinedButton.icon(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Logout'),
-          ),
-        ),
-      ],
+      actions: const [],
     );
   }
 
@@ -211,26 +210,109 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   .toList(growable: false),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _logout,
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Logout'),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomNav() {
-    return NavigationBar(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: (index) {
-        setState(() => _selectedIndex = index);
-      },
-      destinations: _destinations
-          .map(
-            (d) => NavigationDestination(
-              icon: Icon(d.icon),
-              selectedIcon: Icon(d.selectedIcon),
-              label: d.label,
+  Widget _buildDrawer() {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0F5FF),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.admin_panel_settings_rounded,
+                      color: mustBlue,
+                      size: 30,
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'FAST Admin',
+                      style: TextStyle(
+                        color: mustBlue,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Choose a workspace section.',
+                      style: TextStyle(color: Color(0xFF617089)),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          )
-          .toList(growable: false),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: _destinations.length,
+                itemBuilder: (context, index) {
+                  final destination = _destinations[index];
+                  final selected = _selectedIndex == index;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: ListTile(
+                      selected: selected,
+                      selectedColor: mustBlue,
+                      selectedTileColor: const Color(0xFFEAF1FB),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      leading: Icon(
+                        selected ? destination.selectedIcon : destination.icon,
+                      ),
+                      title: Text(
+                        destination.label,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      onTap: () {
+                        setState(() => _selectedIndex = index);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Logout'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -240,7 +322,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     Navigator.of(context).pushAndRemoveUntil(
       // FIX: removed `const` — HomeScreen cannot be a compile-time constant
-      MaterialPageRoute<void>(builder: (_) => HomeScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => const LoginScreen(adminOnly: true),
+      ),
       (route) => false,
     );
   }

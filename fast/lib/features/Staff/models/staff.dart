@@ -94,6 +94,9 @@ class Staff {
   bool get hasEmail => email?.isNotEmpty == true;
   bool get hasPhone => phone?.isNotEmpty == true;
   bool get hasBio => bio?.isNotEmpty == true;
+  bool get hasDepartment =>
+      departmentName?.trim().isNotEmpty == true ||
+      department?.trim().isNotEmpty == true;
   bool get isPublished => status == 'published';
   bool get isDean => roleType == 'dean';
   bool get isHod => roleType == 'hod';
@@ -113,6 +116,12 @@ class Staff {
     }
     return 'FAST';
   }
+
+  String get displayDepartmentCode => departmentCodeFor(
+    displayDepartment,
+    roleType: roleType,
+    position: position,
+  );
 
   String get displayRoleLabel {
     switch (roleType) {
@@ -186,5 +195,60 @@ class Staff {
       return 'key_contact';
     }
     return 'staff';
+  }
+
+  static String departmentCodeFor(
+    String? department, {
+    String? roleType,
+    String? position,
+  }) {
+    final label = department?.trim() ?? '';
+    final normalized = '$label ${position ?? ''} ${roleType ?? ''}'
+        .toLowerCase()
+        .replaceAll("'", '')
+        .replaceAll('’', '');
+
+    if (roleType == 'dean' ||
+        normalized.contains('dean') ||
+        normalized.contains('deans office')) {
+      return "DEAN'S";
+    }
+    if (normalized.contains('eee') ||
+        (normalized.contains('electrical') &&
+            normalized.contains('electronics'))) {
+      return 'EEE';
+    }
+    if (normalized.contains('pem') ||
+        normalized.contains('peem') ||
+        normalized.contains('petroleum')) {
+      return 'PEEM';
+    }
+    if (normalized.contains('cve') || normalized.contains('civil')) {
+      return 'CVE';
+    }
+    if (normalized.contains('bme') || normalized.contains('biomedical')) {
+      return 'BME';
+    }
+    if (normalized.contains('mie') ||
+        normalized.contains('mechanical') ||
+        normalized.contains('industrial')) {
+      return 'MIE';
+    }
+
+    final words = label
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .toList(growable: false);
+    if (words.isEmpty) {
+      return 'FAST';
+    }
+
+    final initials =
+        words
+            .where((word) => word.length > 2 || word == words.first)
+            .map((word) => word[0].toUpperCase())
+            .join();
+
+    return initials.isEmpty ? label.substring(0, 1).toUpperCase() : initials;
   }
 }

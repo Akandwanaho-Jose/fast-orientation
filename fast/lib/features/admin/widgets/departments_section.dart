@@ -41,14 +41,11 @@ class DepartmentsAdminSection extends StatelessWidget {
           subtitle:
               'Manage the faculty’s public department profiles and the information students see in Explore FAST.',
           actions: [
-            ElevatedButton.icon(
+            AdminPrimaryActionButton(
               onPressed: () => _showEditDialog(context),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('New Department'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: mustBlue,
-                foregroundColor: Colors.white,
-              ),
+              icon: Icons.add_rounded,
+              label: 'New Department',
+              compactLabel: 'New',
             ),
           ],
           child:
@@ -168,7 +165,10 @@ class DepartmentsAdminSection extends StatelessWidget {
                         'Full description',
                         maxLines: 5,
                       ),
-                      _field(imageUrlController, 'Image URL'),
+                      AdminImageUrlField(
+                        controller: imageUrlController,
+                        label: 'Department image',
+                      ),
                       _field(headNameController, 'Head name'),
                       _field(headTitleController, 'Head title'),
                       _field(
@@ -176,7 +176,10 @@ class DepartmentsAdminSection extends StatelessWidget {
                         'Head message',
                         maxLines: 4,
                       ),
-                      _field(headImageUrlController, 'Head image URL'),
+                      AdminImageUrlField(
+                        controller: headImageUrlController,
+                        label: 'Head image',
+                      ),
                       _field(emailController, 'Contact email'),
                       _field(phoneController, 'Contact phone'),
                       _field(locationController, 'Location'),
@@ -187,7 +190,7 @@ class DepartmentsAdminSection extends StatelessWidget {
                         title: const Text('Featured'),
                       ),
                       DropdownButtonFormField<String>(
-                        value: status,
+                        initialValue: status,
                         decoration: InputDecoration(
                           labelText: 'Status',
                           border: OutlineInputBorder(
@@ -349,6 +352,11 @@ class _DepartmentAdminCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          AdminImageThumbnail(
+            imageUrl: department.displayImageUrl,
+            icon: Icons.account_balance_rounded,
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,22 +397,8 @@ class _DepartmentAdminCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Column(
-            children: [
-              IconButton(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded),
-                tooltip: 'Edit',
-              ),
-              IconButton(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Delete',
-                color: Colors.red,
-              ),
-            ],
-          ),
+          const SizedBox(width: 8),
+          AdminOverflowActions(onEdit: onEdit, onDelete: onDelete),
         ],
       ),
     );

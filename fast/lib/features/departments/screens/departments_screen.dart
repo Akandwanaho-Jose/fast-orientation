@@ -17,7 +17,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
     with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  
+
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   bool _showNavigationGuide = true;
@@ -40,11 +40,11 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    
+
     _animationController.forward();
   }
 
@@ -70,7 +70,14 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
     BoxFit fit = BoxFit.cover,
     Widget? fallback,
   }) {
-    if (imageUrl == null || imageUrl.isEmpty) {
+    final trimmedUrl = imageUrl?.trim() ?? '';
+    final uri = Uri.tryParse(trimmedUrl);
+    final isRemoteImage =
+        uri != null &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https');
+
+    if (!isRemoteImage) {
       return fallback ?? _buildImageFallback(width, height);
     }
 
@@ -78,38 +85,39 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     int? memCacheWidth;
     int? memCacheHeight;
-    
+
     if (width != double.infinity && !width.isNaN) {
       memCacheWidth = (width * devicePixelRatio).round();
     }
-    
+
     if (height != double.infinity && !height.isNaN) {
       memCacheHeight = (height * devicePixelRatio).round();
     }
 
     return CachedNetworkImage(
-      imageUrl: imageUrl,
+      imageUrl: trimmedUrl,
       width: width,
       height: height,
       fit: fit,
-      placeholder: (context, url) => Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(mustBlue),
+      placeholder:
+          (context, url) => Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(mustBlue),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
       errorWidget: (context, url, error) {
         // Log error for debugging in development
         debugPrint('Error loading department image: $url - $error');
@@ -131,10 +139,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            mustBlue.withOpacity(0.8),
-            mustBlue.withOpacity(0.6),
-          ],
+          colors: [mustBlue.withOpacity(0.8), mustBlue.withOpacity(0.6)],
         ),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -163,17 +168,14 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              mustBlue.withOpacity(0.05),
-              Colors.white,
-            ],
+            colors: [mustBlue.withOpacity(0.05), Colors.white],
           ),
         ),
         child: RefreshIndicator(
@@ -225,10 +227,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                mustBlue,
-                mustBlue.withOpacity(0.8),
-              ],
+              colors: [mustBlue, mustBlue.withOpacity(0.8)],
             ),
           ),
           child: Stack(
@@ -333,7 +332,12 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
                       _buildPathArrow(),
                       _buildPathStep('2', 'Programs', mustGreen, false),
                       _buildPathArrow(),
-                      _buildPathStep('3', 'Courses', const Color(0xFFFF9800), false),
+                      _buildPathStep(
+                        '3',
+                        'Courses',
+                        const Color(0xFFFF9800),
+                        false,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -370,7 +374,12 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
     );
   }
 
-  Widget _buildPathStep(String number, String label, Color color, bool isActive) {
+  Widget _buildPathStep(
+    String number,
+    String label,
+    Color color,
+    bool isActive,
+  ) {
     return Expanded(
       child: Column(
         children: [
@@ -411,11 +420,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
   Widget _buildPathArrow() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
-      child: Icon(
-        Icons.arrow_forward,
-        color: Colors.grey[400],
-        size: 20,
-      ),
+      child: Icon(Icons.arrow_forward, color: Colors.grey[400], size: 20),
     );
   }
 
@@ -439,10 +444,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
               const SizedBox(height: 8),
               Text(
                 'Choose your academic path and discover exciting opportunities',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
               const SizedBox(height: 20),
               Container(
@@ -468,19 +470,20 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
                     hintText: 'Search departments...',
                     hintStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.search, color: mustBlue),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear, color: Colors.grey[400]),
-                            onPressed: () {
-                              _searchController.clear();
-                              _updateState(() {
-                                _searchQuery = '';
-                              });
-                              HapticFeedback.lightImpact();
-                            },
-                            tooltip: 'Clear search',
-                          )
-                        : null,
+                    suffixIcon:
+                        _searchQuery.isNotEmpty
+                            ? IconButton(
+                              icon: Icon(Icons.clear, color: Colors.grey[400]),
+                              onPressed: () {
+                                _searchController.clear();
+                                _updateState(() {
+                                  _searchQuery = '';
+                                });
+                                HapticFeedback.lightImpact();
+                              },
+                              tooltip: 'Clear search',
+                            )
+                            : null,
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -498,29 +501,32 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
 
   Widget _buildDepartmentsList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('departments')
-          .orderBy('name')
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('departments')
+              .orderBy('name')
+              .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           debugPrint('Error loading departments: ${snapshot.error}');
           return SliverToBoxAdapter(child: _buildErrorState());
         }
-        
-        if (snapshot.connectionState == ConnectionState.waiting && _cachedDepartments == null) {
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            _cachedDepartments == null) {
           return SliverToBoxAdapter(child: _buildLoadingState());
         }
 
         List<Department> departments;
         if (snapshot.hasData) {
           try {
-            departments = snapshot.data!.docs.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              data['id'] = doc.id;
-              return Department.fromJson(data, []);
-            }).toList();
-            
+            departments =
+                snapshot.data!.docs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  data['id'] = doc.id;
+                  return Department.fromJson(data, []);
+                }).toList();
+
             // Cache the departments
             _cachedDepartments = departments;
           } catch (e) {
@@ -535,27 +541,25 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
           return SliverToBoxAdapter(child: _buildEmptyState());
         }
 
-        final filteredDepartments = departments.where((department) {
-          if (_searchQuery.isEmpty) return true;
-          return department.name.toLowerCase().contains(_searchQuery) ||
-                 department.description.toLowerCase().contains(_searchQuery);
-        }).toList();
+        final filteredDepartments =
+            departments.where((department) {
+              if (_searchQuery.isEmpty) return true;
+              return department.name.toLowerCase().contains(_searchQuery) ||
+                  department.description.toLowerCase().contains(_searchQuery);
+            }).toList();
 
         if (filteredDepartments.isEmpty) {
           return SliverToBoxAdapter(child: _buildEmptySearchState());
         }
 
         return SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final department = filteredDepartments[index];
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: _buildDepartmentCard(department, index),
-              );
-            },
-            childCount: filteredDepartments.length,
-          ),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final department = filteredDepartments[index];
+            return FadeTransition(
+              opacity: _fadeAnimation,
+              child: _buildDepartmentCard(department, index),
+            );
+          }, childCount: filteredDepartments.length),
         );
       },
     );
@@ -648,7 +652,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
                       ),
                     ],
                   ),
-                  
+
                   // Content Section
                   Padding(
                     padding: const EdgeInsets.all(20),
@@ -660,7 +664,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: _getDepartmentColor(index).withOpacity(0.1),
+                                color: _getDepartmentColor(
+                                  index,
+                                ).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
@@ -700,7 +706,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
                           decoration: BoxDecoration(
                             color: mustBlue.withOpacity(0.05),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: mustBlue.withOpacity(0.2)),
+                            border: Border.all(
+                              color: mustBlue.withOpacity(0.2),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -738,18 +746,18 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            DepartmentDetailsScreen(department: department),
+        pageBuilder:
+            (context, animation, secondaryAnimation) =>
+                DepartmentDetailsScreen(department: department),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return SlideTransition(
             position: animation.drive(
-              Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
-                  .chain(CurveTween(curve: Curves.easeInOutCubic)),
+              Tween(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).chain(CurveTween(curve: Curves.easeInOutCubic)),
             ),
-            child: FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
+            child: FadeTransition(opacity: animation, child: child),
           );
         },
         transitionDuration: const Duration(milliseconds: 400),
@@ -771,7 +779,9 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
 
   IconData _getDepartmentIcon(String departmentName) {
     final name = departmentName.toLowerCase();
-    if (name.contains('computer') || name.contains('software') || name.contains('it')) {
+    if (name.contains('computer') ||
+        name.contains('software') ||
+        name.contains('it')) {
       return Icons.computer;
     } else if (name.contains('engineering') || name.contains('tech')) {
       return Icons.engineering;
@@ -813,10 +823,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
           const SizedBox(height: 8),
           Text(
             'Please wait while we fetch the latest information',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 14,
-            ),
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
             textAlign: TextAlign.center,
           ),
         ],
@@ -900,11 +907,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.school_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.school_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No Departments Available',
@@ -917,9 +920,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
           const SizedBox(height: 8),
           Text(
             'No departments have been added to the system yet.',
-            style: TextStyle(
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
@@ -959,9 +960,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
           const SizedBox(height: 8),
           Text(
             'No departments match your search criteria.\nTry using different keywords.',
-            style: TextStyle(
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(color: Colors.grey[500]),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
@@ -977,9 +976,7 @@ class _DepartmentsScreenState extends State<DepartmentsScreen>
                 },
                 icon: const Icon(Icons.clear),
                 label: const Text('Clear Search'),
-                style: TextButton.styleFrom(
-                  foregroundColor: mustBlue,
-                ),
+                style: TextButton.styleFrom(foregroundColor: mustBlue),
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(

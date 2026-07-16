@@ -33,13 +33,14 @@ class AdminOverviewSection extends StatelessWidget {
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
                   final crossAxisCount = width >= 1100 ? 4 : 2;
+                  final childAspectRatio = width < 520 ? 1.18 : 1.45;
                   return GridView.count(
                     crossAxisCount: crossAxisCount,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisSpacing: 14,
                     mainAxisSpacing: 14,
-                    childAspectRatio: 1.45,
+                    childAspectRatio: childAspectRatio,
                     children: [
                       AdminStatCard(
                         label: 'Departments',

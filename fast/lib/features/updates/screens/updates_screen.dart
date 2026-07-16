@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fast/core/theme/fast_brand.dart';
 import 'package:fast/core/utils/constants.dart';
+import 'package:fast/core/widgets/safe_remote_image.dart';
 import 'package:fast/features/annoucements/models/announcement.dart';
 import 'package:fast/features/annoucements/screens/annoucement_details_screen.dart';
+import 'package:fast/features/updates/widgets/update_share_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -29,14 +31,29 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     ),
     _TypeFilter(label: 'Events', value: 'event', icon: Icons.event_rounded),
     _TypeFilter(
-      label: 'Deadlines',
-      value: 'deadline',
-      icon: Icons.schedule_rounded,
+      label: 'Student Life',
+      value: 'student_life',
+      icon: Icons.groups_rounded,
+    ),
+    _TypeFilter(
+      label: 'Research',
+      value: 'research',
+      icon: Icons.science_rounded,
+    ),
+    _TypeFilter(
+      label: 'Innovation',
+      value: 'innovation',
+      icon: Icons.lightbulb_rounded,
     ),
     _TypeFilter(
       label: 'Opportunities',
       value: 'opportunity',
       icon: Icons.star_rounded,
+    ),
+    _TypeFilter(
+      label: 'Deadlines',
+      value: 'deadline',
+      icon: Icons.schedule_rounded,
     ),
   ];
 
@@ -296,6 +313,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
               announcement: announcement,
               isRead: _readIds.contains(announcement.id),
               onOpen: () => _openDetails(announcement),
+              onShare: () => _shareUpdate(announcement),
             ),
           ),
         );
@@ -419,7 +437,41 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   }
 
   bool _matchesType(Announcement announcement) {
-    return _selectedType == 'all' || announcement.type == _selectedType;
+    if (_selectedType == 'all') {
+      return true;
+    }
+    if (announcement.type == _selectedType) {
+      return true;
+    }
+    return _matchesContentFacet(announcement, _selectedType);
+  }
+
+  bool _matchesContentFacet(Announcement announcement, String facet) {
+    final searchableText =
+        [
+          announcement.displayCategory,
+          announcement.displayType,
+          announcement.category ?? '',
+          ...announcement.tags,
+        ].join(' ').toLowerCase();
+
+    switch (facet) {
+      case 'student_life':
+        return searchableText.contains('student') ||
+            searchableText.contains('life') ||
+            searchableText.contains('campus');
+      case 'research':
+        return searchableText.contains('research') ||
+            searchableText.contains('publication') ||
+            searchableText.contains('project');
+      case 'innovation':
+        return searchableText.contains('innovation') ||
+            searchableText.contains('startup') ||
+            searchableText.contains('prototype') ||
+            searchableText.contains('technology');
+      default:
+        return false;
+    }
   }
 
   bool _matchesSearch(Announcement announcement) {
@@ -464,6 +516,11 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
         transitionDuration: const Duration(milliseconds: 280),
       ),
     );
+  }
+
+  void _shareUpdate(Announcement announcement) {
+    HapticFeedback.selectionClick();
+    showUpdateShareSheet(context, announcement);
   }
 }
 
@@ -659,11 +716,13 @@ class _UpdateCard extends StatelessWidget {
     required this.announcement,
     required this.isRead,
     required this.onOpen,
+    required this.onShare,
   });
 
   final Announcement announcement;
   final bool isRead;
   final VoidCallback onOpen;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -691,13 +750,15 @@ class _UpdateCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (announcement.hasImages)
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
-                  child: _ImageStrip(announcement: announcement),
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
                 ),
+                child:
+                    announcement.hasImages
+                        ? _ImageStrip(announcement: announcement)
+                        : _ImagePlaceholder(announcement: announcement),
+              ),
               Padding(
                 padding: const EdgeInsets.all(18),
                 child: Column(
@@ -858,6 +919,35 @@ class _UpdateCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: onOpen,
+                          icon: const Icon(Icons.article_rounded, size: 18),
+                          label: const Text('Read More'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: FastBrand.primary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton.filledTonal(
+                          onPressed: onShare,
+                          tooltip: 'Share update',
+                          style: IconButton.styleFrom(
+                            backgroundColor: FastBrand.primary.withValues(
+                              alpha: 0.08,
+                            ),
+                            foregroundColor: FastBrand.primary,
+                          ),
+                          icon: const Icon(Icons.ios_share_rounded, size: 19),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -941,37 +1031,18 @@ class _ImageStripState extends State<_ImageStrip> {
               });
             },
             itemBuilder: (context, index) {
-              return Image.network(
-                urls[index],
+              final image = SafeRemoteImage(
+                imageUrl: urls[index],
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) {
-                  return Container(
-                    color: FastBrand.softSurface,
-                    child: const Center(
-                      child: Icon(
-                        Icons.image_not_supported_rounded,
-                        size: 32,
-                        color: FastBrand.mutedText,
-                      ),
-                    ),
-                  );
-                },
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) {
-                    return child;
-                  }
-
-                  return Container(
-                    color: FastBrand.softSurface,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: mustBlue,
-                        strokeWidth: 2,
-                      ),
-                    ),
-                  );
-                },
+                fallback: _ImagePlaceholder(announcement: widget.announcement),
               );
+              if (index == 0) {
+                return Hero(
+                  tag: 'announcement-${widget.announcement.id}',
+                  child: image,
+                );
+              }
+              return image;
             },
           ),
           if (urls.length > 1)
@@ -1008,6 +1079,83 @@ class _ImageStripState extends State<_ImageStrip> {
         ],
       ),
     );
+  }
+}
+
+class _ImagePlaceholder extends StatelessWidget {
+  const _ImagePlaceholder({required this.announcement});
+
+  final Announcement announcement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 168,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            FastBrand.primary.withValues(alpha: 0.94),
+            FastBrand.primaryStrong.withValues(alpha: 0.84),
+            _accentColor().withValues(alpha: 0.78),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: FastBrand.glassPillDecoration(),
+                child: Icon(_icon(), color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  announcement.displayType,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _icon() {
+    switch (announcement.type) {
+      case 'event':
+        return Icons.event_rounded;
+      case 'deadline':
+        return Icons.schedule_rounded;
+      case 'opportunity':
+        return Icons.star_rounded;
+      default:
+        return Icons.campaign_rounded;
+    }
+  }
+
+  Color _accentColor() {
+    switch (announcement.type) {
+      case 'event':
+        return FastBrand.secondary;
+      case 'deadline':
+        return FastBrand.danger;
+      case 'opportunity':
+        return FastBrand.warning;
+      default:
+        return FastBrand.primaryStrong;
+    }
   }
 }
 

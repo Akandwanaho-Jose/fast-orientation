@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
@@ -26,7 +27,7 @@ class SafeRemoteImage extends StatelessWidget {
     }
 
     if (trimmed.startsWith('assets/')) {
-      return true;
+      return _isBundledAssetPath(trimmed);
     }
 
     final uri = Uri.tryParse(trimmed);
@@ -37,6 +38,13 @@ class SafeRemoteImage extends StatelessWidget {
     return uri.scheme == 'http' || uri.scheme == 'https' || uri.scheme == 'gs';
   }
 
+  static bool _isBundledAssetPath(String path) {
+    return path == 'assets/images/MUST.jpg' ||
+        path == 'assets/images/MUST_LOGO.png' ||
+        path.startsWith('assets/images/home/') ||
+        path.startsWith('assets/images/quick_links/');
+  }
+
   @override
   Widget build(BuildContext context) {
     final trimmed = imageUrl?.trim() ?? '';
@@ -45,6 +53,9 @@ class SafeRemoteImage extends StatelessWidget {
     }
 
     if (trimmed.startsWith('assets/')) {
+      if (!_isBundledAssetPath(trimmed)) {
+        return _buildFallback();
+      }
       return Image.asset(
         trimmed,
         fit: fit,
@@ -82,18 +93,13 @@ class SafeRemoteImage extends StatelessWidget {
   }
 
   Widget _buildNetworkImage(String url) {
-    return Image.network(
-      url,
+    return CachedNetworkImage(
+      imageUrl: url,
       fit: fit,
       alignment: alignment,
       filterQuality: filterQuality,
-      errorBuilder: (_, __, ___) => _buildFallback(),
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) {
-          return child;
-        }
-        return _buildFallback();
-      },
+      placeholder: (_, __) => _buildFallback(),
+      errorWidget: (_, __, ___) => _buildFallback(),
     );
   }
 

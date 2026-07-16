@@ -46,24 +46,26 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
           subtitle:
               'Create and manage announcements, events, deadlines, and opportunities from one structured workflow.',
           actions: [
-            Wrap(
-              spacing: 8,
-              children: [
-                _filterChip('all', 'All'),
-                _filterChip('announcement', 'Announcements'),
-                _filterChip('event', 'Events'),
-                _filterChip('deadline', 'Deadlines'),
-                _filterChip('opportunity', 'Opportunities'),
-              ],
-            ),
-            ElevatedButton.icon(
-              onPressed: () => _showEditDialog(),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('New Update'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: mustBlue,
-                foregroundColor: Colors.white,
+            AdminHorizontalScroller(
+              child: Row(
+                children: [
+                  _filterChip('all', 'All'),
+                  const SizedBox(width: 8),
+                  _filterChip('announcement', 'Announcements'),
+                  const SizedBox(width: 8),
+                  _filterChip('event', 'Events'),
+                  const SizedBox(width: 8),
+                  _filterChip('deadline', 'Deadlines'),
+                  const SizedBox(width: 8),
+                  _filterChip('opportunity', 'Opportunities'),
+                ],
               ),
+            ),
+            AdminPrimaryActionButton(
+              onPressed: () => _showEditDialog(),
+              icon: Icons.add_rounded,
+              label: 'New Update',
+              compactLabel: 'New',
             ),
           ],
           child:
@@ -142,9 +144,19 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
     final actionUrlController = TextEditingController(
       text: existing?.actionUrl ?? '',
     );
+    final notificationTitleController = TextEditingController(
+      text: existing?.pushNotificationTitle ?? '',
+    );
+    final notificationBodyController = TextEditingController(
+      text: existing?.pushNotificationBody ?? '',
+    );
     var type = existing?.type ?? 'announcement';
     var priority = existing?.priority ?? 'normal';
     var status = existing?.status ?? 'published';
+    var sendPushNotification = existing == null && status == 'published';
+    var notificationTopic =
+        existing?.pushNotificationTopic ??
+        _defaultNotificationTopic(type: type, priority: priority);
     var isPinned = existing?.isPinned ?? false;
     var featured = existing?.featured ?? false;
 
@@ -170,7 +182,7 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                       _field(titleController, 'Title'),
                       _field(descriptionController, 'Description', maxLines: 5),
                       DropdownButtonFormField<String>(
-                        value: type,
+                        initialValue: type,
                         decoration: _decoration('Type'),
                         items: const [
                           DropdownMenuItem(
@@ -191,13 +203,21 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                           ),
                         ],
                         onChanged: (value) {
-                          if (value != null) setState(() => type = value);
+                          if (value != null) {
+                            setState(() {
+                              type = value;
+                              notificationTopic = _defaultNotificationTopic(
+                                type: type,
+                                priority: priority,
+                              );
+                            });
+                          }
                         },
                       ),
                       const SizedBox(height: 12),
                       _field(categoryController, 'Category'),
                       DropdownButtonFormField<String>(
-                        value: priority,
+                        initialValue: priority,
                         decoration: _decoration('Priority'),
                         items: const [
                           DropdownMenuItem(
@@ -214,12 +234,20 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                           ),
                         ],
                         onChanged: (value) {
-                          if (value != null) setState(() => priority = value);
+                          if (value != null) {
+                            setState(() {
+                              priority = value;
+                              notificationTopic = _defaultNotificationTopic(
+                                type: type,
+                                priority: priority,
+                              );
+                            });
+                          }
                         },
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: status,
+                        initialValue: status,
                         decoration: _decoration('Status'),
                         items: const [
                           DropdownMenuItem(
@@ -232,7 +260,16 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                           ),
                         ],
                         onChanged: (value) {
-                          if (value != null) setState(() => status = value);
+                          if (value != null) {
+                            setState(() {
+                              status = value;
+                              if (status != 'published') {
+                                sendPushNotification = false;
+                              } else if (existing == null) {
+                                sendPushNotification = true;
+                              }
+                            });
+                          }
                         },
                       ),
                       const SizedBox(height: 12),
@@ -242,13 +279,93 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                         departmentIdsController,
                         'Department IDs (comma separated)',
                       ),
-                      _field(
-                        imageUrlsController,
-                        'Image URLs (comma separated)',
-                        maxLines: 3,
+                      AdminImageUrlField(
+                        controller: imageUrlsController,
+                        label: 'Update images',
+                        multiple: true,
                       ),
                       _field(actionLabelController, 'Action label'),
                       _field(actionUrlController, 'Action URL'),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFD),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value: sendPushNotification,
+                              onChanged:
+                                  (value) => setState(
+                                    () => sendPushNotification = value,
+                                  ),
+                              title: const Text('Send phone notification'),
+                              subtitle: const Text(
+                                'New published updates send a short push alert by default. Turn this off for quiet content edits.',
+                              ),
+                            ),
+                            if (sendPushNotification) ...[
+                              const SizedBox(height: 10),
+                              _field(
+                                notificationTitleController,
+                                'Notification title',
+                              ),
+                              _field(
+                                notificationBodyController,
+                                'Notification highlight',
+                                maxLines: 3,
+                              ),
+                              DropdownButtonFormField<String>(
+                                initialValue: notificationTopic,
+                                decoration: _decoration(
+                                  'Notification audience',
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'announcements',
+                                    child: Text('All update subscribers'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'urgent_announcements',
+                                    child: Text('Urgent alerts'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'events',
+                                    child: Text('Events'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'deadlines',
+                                    child: Text('Deadlines'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'opportunities',
+                                    child: Text('Opportunities'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'academic',
+                                    child: Text('Academic'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'general',
+                                    child: Text('General'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() => notificationTopic = value);
+                                  }
+                                },
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         value: isPinned,
@@ -272,6 +389,19 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    if (sendPushNotification && status != 'published') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Publish the update before sending a phone notification.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final title = titleController.text.trim();
+                    final description = descriptionController.text.trim();
                     final collection = FirebaseFirestore.instance.collection(
                       'announcements',
                     );
@@ -280,8 +410,8 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                             ? collection.doc()
                             : collection.doc(existing.id);
                     await doc.set({
-                      'title': titleController.text.trim(),
-                      'description': descriptionController.text.trim(),
+                      'title': title,
+                      'description': description,
                       'category': categoryController.text.trim(),
                       'type': type,
                       'priority': priority,
@@ -300,6 +430,26 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
                               ? FieldValue.serverTimestamp()
                               : Timestamp.fromDate(existing.postedAt),
                     }, SetOptions(merge: true));
+                    if (sendPushNotification) {
+                      await doc.update({
+                        'pushNotification.enabled': true,
+                        'pushNotification.title':
+                            notificationTitleController.text.trim().isEmpty
+                                ? _defaultNotificationTitle(title)
+                                : notificationTitleController.text.trim(),
+                        'pushNotification.body':
+                            notificationBodyController.text.trim().isEmpty
+                                ? _defaultNotificationBody(description)
+                                : notificationBodyController.text.trim(),
+                        'pushNotification.topic': notificationTopic,
+                        'pushNotification.status': 'pending',
+                        'pushNotification.requestedAt':
+                            FieldValue.serverTimestamp(),
+                        'pushNotification.error': FieldValue.delete(),
+                      });
+                    } else {
+                      await doc.update({'pushNotification.enabled': false});
+                    }
                     if (!context.mounted) return;
                     Navigator.of(context).pop();
                   },
@@ -337,6 +487,41 @@ class _UpdatesAdminSectionState extends State<UpdatesAdminSection> {
         decoration: _decoration(label),
       ),
     );
+  }
+
+  String _defaultNotificationTitle(String title) {
+    final trimmed = title.trim();
+    return trimmed.isEmpty ? 'FAST Update' : trimmed;
+  }
+
+  String _defaultNotificationBody(String description) {
+    final trimmed = description.trim();
+    if (trimmed.isEmpty) {
+      return 'A new FAST update has been published.';
+    }
+    if (trimmed.length <= 120) {
+      return trimmed;
+    }
+    return '${trimmed.substring(0, 117).trimRight()}...';
+  }
+
+  String _defaultNotificationTopic({
+    required String type,
+    required String priority,
+  }) {
+    if (priority == 'urgent') {
+      return 'urgent_announcements';
+    }
+    switch (type) {
+      case 'event':
+        return 'events';
+      case 'deadline':
+        return 'deadlines';
+      case 'opportunity':
+        return 'opportunities';
+      default:
+        return 'announcements';
+    }
   }
 
   Future<void> _confirmDelete(String id, String title) async {
@@ -393,6 +578,11 @@ class _UpdateAdminCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          AdminImageThumbnail(
+            imageUrl: announcement.mainImageUrl,
+            icon: Icons.campaign_rounded,
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,6 +606,10 @@ class _UpdateAdminCard extends StatelessWidget {
                         label: 'Featured',
                         color: Color(0xFFD97706),
                       ),
+                    if (announcement.hasSentPushNotification)
+                      const AdminTag(label: 'Push sent', color: mustGreen),
+                    if (announcement.pushNotificationStatus == 'failed')
+                      const AdminTag(label: 'Push failed', color: Colors.red),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -437,20 +631,8 @@ class _UpdateAdminCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Column(
-            children: [
-              IconButton(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded),
-              ),
-              IconButton(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: Colors.red,
-              ),
-            ],
-          ),
+          const SizedBox(width: 8),
+          AdminOverflowActions(onEdit: onEdit, onDelete: onDelete),
         ],
       ),
     );

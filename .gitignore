@@ -10,6 +10,7 @@ flutter_*.snapshot
 # Ignore generated files
 *.g.dart
 *.freezed.dart
+.firebase/
 
 # Ignore sensitive files
 ios/Flutter/App.framework

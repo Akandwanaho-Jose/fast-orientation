@@ -18,6 +18,12 @@ class Announcement {
   final String status;
   final String? actionLabel;
   final String? actionUrl;
+  final bool pushNotificationEnabled;
+  final String? pushNotificationTitle;
+  final String? pushNotificationBody;
+  final String pushNotificationTopic;
+  final String? pushNotificationStatus;
+  final DateTime? pushNotificationSentAt;
 
   Announcement({
     required this.id,
@@ -37,6 +43,12 @@ class Announcement {
     this.status = 'published',
     this.actionLabel,
     this.actionUrl,
+    this.pushNotificationEnabled = false,
+    this.pushNotificationTitle,
+    this.pushNotificationBody,
+    this.pushNotificationTopic = 'announcements',
+    this.pushNotificationStatus,
+    this.pushNotificationSentAt,
   });
 
   factory Announcement.fromJson(Map<String, dynamic> json, String id) {
@@ -68,6 +80,19 @@ class Announcement {
         status: _getStringValue(json, 'status', 'published').toLowerCase(),
         actionLabel: _getNullableString(json, 'actionLabel'),
         actionUrl: _getNullableString(json, 'actionUrl'),
+        pushNotificationEnabled: _getPushBoolValue(json, 'enabled', false),
+        pushNotificationTitle: _getPushNullableString(json, 'title'),
+        pushNotificationBody: _getPushNullableString(json, 'body'),
+        pushNotificationTopic: _getPushStringValue(
+          json,
+          'topic',
+          _defaultNotificationTopic(
+            resolvedType,
+            _getStringValue(json, 'priority', 'normal').toLowerCase(),
+          ),
+        ),
+        pushNotificationStatus: _getPushNullableString(json, 'status'),
+        pushNotificationSentAt: _getPushDateTimeValue(json, 'sentAt'),
       );
     } catch (e) {
       return Announcement(
@@ -213,6 +238,18 @@ class Announcement {
       'status': status,
       if (actionLabel?.isNotEmpty == true) 'actionLabel': actionLabel,
       if (actionUrl?.isNotEmpty == true) 'actionUrl': actionUrl,
+      'pushNotification': {
+        'enabled': pushNotificationEnabled,
+        if (pushNotificationTitle?.isNotEmpty == true)
+          'title': pushNotificationTitle,
+        if (pushNotificationBody?.isNotEmpty == true)
+          'body': pushNotificationBody,
+        'topic': pushNotificationTopic,
+        if (pushNotificationStatus?.isNotEmpty == true)
+          'status': pushNotificationStatus,
+        if (pushNotificationSentAt != null)
+          'sentAt': Timestamp.fromDate(pushNotificationSentAt!),
+      },
     };
   }
 
@@ -229,6 +266,7 @@ class Announcement {
           : _categoryFromType(type);
   bool get hasAction =>
       actionLabel?.isNotEmpty == true && actionUrl?.isNotEmpty == true;
+  bool get hasSentPushNotification => pushNotificationStatus == 'sent';
 
   Announcement copyWith({
     String? title,
@@ -247,6 +285,12 @@ class Announcement {
     String? status,
     String? actionLabel,
     String? actionUrl,
+    bool? pushNotificationEnabled,
+    String? pushNotificationTitle,
+    String? pushNotificationBody,
+    String? pushNotificationTopic,
+    String? pushNotificationStatus,
+    DateTime? pushNotificationSentAt,
   }) {
     return Announcement(
       id: id,
@@ -266,7 +310,85 @@ class Announcement {
       status: status ?? this.status,
       actionLabel: actionLabel ?? this.actionLabel,
       actionUrl: actionUrl ?? this.actionUrl,
+      pushNotificationEnabled:
+          pushNotificationEnabled ?? this.pushNotificationEnabled,
+      pushNotificationTitle:
+          pushNotificationTitle ?? this.pushNotificationTitle,
+      pushNotificationBody: pushNotificationBody ?? this.pushNotificationBody,
+      pushNotificationTopic:
+          pushNotificationTopic ?? this.pushNotificationTopic,
+      pushNotificationStatus:
+          pushNotificationStatus ?? this.pushNotificationStatus,
+      pushNotificationSentAt:
+          pushNotificationSentAt ?? this.pushNotificationSentAt,
     );
+  }
+
+  static Map<String, dynamic> _getPushMap(Map<String, dynamic> json) {
+    final value = json['pushNotification'];
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, value) => MapEntry('$key', value));
+    }
+    return const <String, dynamic>{};
+  }
+
+  static String _getPushStringValue(
+    Map<String, dynamic> json,
+    String key,
+    String fallback,
+  ) {
+    return _getStringValue(_getPushMap(json), key, fallback);
+  }
+
+  static String? _getPushNullableString(Map<String, dynamic> json, String key) {
+    return _getNullableString(_getPushMap(json), key);
+  }
+
+  static bool _getPushBoolValue(
+    Map<String, dynamic> json,
+    String key,
+    bool fallback,
+  ) {
+    return _getBoolValue(_getPushMap(json), key, fallback);
+  }
+
+  static DateTime? _getPushDateTimeValue(
+    Map<String, dynamic> json,
+    String key,
+  ) {
+    final value = _getPushMap(json)[key];
+    if (value == null) {
+      return null;
+    }
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+    if (value is DateTime) {
+      return value;
+    }
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  static String _defaultNotificationTopic(String type, String priority) {
+    if (priority == 'urgent') {
+      return 'urgent_announcements';
+    }
+    switch (type) {
+      case 'event':
+        return 'events';
+      case 'deadline':
+        return 'deadlines';
+      case 'opportunity':
+        return 'opportunities';
+      default:
+        return 'announcements';
+    }
   }
 
   static String _titleCase(String value) {

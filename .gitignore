@@ -37,3 +37,6 @@ ios/Runner/GeneratedPluginRegistrant.*
 android/.gradle/
 android/app/build/
 ios/.build/
+
+# Accidental browser-profile dumps left over in promo_assets, not project content
+promo_assets/chrome-profile*/

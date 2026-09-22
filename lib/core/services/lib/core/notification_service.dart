@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -197,6 +196,7 @@ class NotificationService {
       await _messaging.subscribeToTopic('academic');
       await _messaging.subscribeToTopic('events');
       await _messaging.subscribeToTopic('deadlines');
+      await _messaging.subscribeToTopic('opportunities');
       await _messaging.subscribeToTopic('general');
 
       if (kDebugMode) {
@@ -220,8 +220,7 @@ class NotificationService {
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
     final title = message.notification?.title ?? 'FAST Connect';
-    final body =
-        message.notification?.body ?? 'New announcement available';
+    final body = message.notification?.body ?? 'New announcement available';
     final data = message.data;
 
     var channelId = _generalChannelId;
@@ -349,10 +348,7 @@ class NotificationService {
           .doc(user.uid)
           .collection('notifications')
           .doc(notificationId)
-          .update({
-            'read': true,
-            'readAt': FieldValue.serverTimestamp(),
-          });
+          .update({'read': true, 'readAt': FieldValue.serverTimestamp()});
     } catch (e) {
       if (kDebugMode) {
         debugPrint('Error marking notification as read: $e');

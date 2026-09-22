@@ -6,7 +6,7 @@ import 'package:fast/features/admin/widgets/overview_section.dart';
 import 'package:fast/features/admin/widgets/people_section.dart';
 import 'package:fast/features/admin/widgets/programs_section.dart';
 import 'package:fast/features/admin/widgets/updates_section.dart';
-import 'package:fast/features/home/screens/home_screen.dart';
+import 'package:fast/features/auth/screens/login_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -322,7 +322,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     Navigator.of(context).pushAndRemoveUntil(
       // FIX: removed `const` — HomeScreen cannot be a compile-time constant
-      MaterialPageRoute<void>(builder: (_) => HomeScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => const LoginScreen(adminOnly: true),
+      ),
       (route) => false,
     );
   }

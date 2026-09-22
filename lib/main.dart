@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:fast/core/navigation/browser_route.dart';
 import 'package:fast/core/services/auth_service.dart';
 import 'package:fast/core/services/lib/core/notification_service.dart';
 import 'package:fast/core/services/lib/core/services/announcement_service.dart';
@@ -13,14 +14,20 @@ import 'package:fast/core/services/lib/core/services/program_service.dart';
 import 'package:fast/core/services/lib/core/services/staff_service.dart';
 import 'package:fast/core/theme/fast_brand.dart';
 import 'package:fast/features/admin/screens/admin_dashboard_screen.dart';
+import 'package:fast/features/auth/screens/login_screen.dart';
 import 'package:fast/features/home/screens/home_screen.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    usePathUrlStrategy();
+  }
   _installGlobalErrorHandling();
   runApp(const BootstrapApp());
 }
@@ -161,7 +168,252 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: FastBrand.appTitle,
         theme: FastBrand.theme(),
-        home: const AuthWrapper(),
+        initialRoute: _initialRouteName(),
+        onGenerateRoute: _routeFor,
+        onUnknownRoute:
+            (_) => MaterialPageRoute<void>(
+              builder: (_) => const HomeScreen(),
+              settings: const RouteSettings(name: '/'),
+            ),
+      ),
+    );
+  }
+
+  String _initialRouteName() {
+    final routeName =
+        browserInitialRoute() ?? PlatformDispatcher.instance.defaultRouteName;
+    return _normalizedPath(routeName);
+  }
+
+  Route<void> _routeFor(RouteSettings settings) {
+    final path = _normalizedPath(settings.name);
+    switch (path) {
+      case '/admin':
+        return MaterialPageRoute<void>(
+          builder: (_) => const AdminEntryScreen(),
+          settings: const RouteSettings(name: '/admin'),
+        );
+      case '/':
+      default:
+        return MaterialPageRoute<void>(
+          builder: (_) => const HomeScreen(),
+          settings: const RouteSettings(name: '/'),
+        );
+    }
+  }
+
+  String _normalizedPath(String? routeName) {
+    final parsed = Uri.tryParse(routeName ?? '/') ?? Uri(path: '/');
+    var path = parsed.path.isEmpty ? '/' : parsed.path;
+    if (!path.startsWith('/')) {
+      path = '/$path';
+    }
+    if (path.length > 1 && path.endsWith('/')) {
+      return path.substring(0, path.length - 1);
+    }
+    return path;
+  }
+}
+
+class AdminEntryScreen extends StatelessWidget {
+  const AdminEntryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!kIsWeb && !kDebugMode) {
+      return const _WebOnlyAdminScreen();
+    }
+
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _StatusScaffold(
+            title: 'Loading admin access...',
+            child: CircularProgressIndicator(color: FastBrand.primary),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const _StatusScaffold(
+            title: 'Admin authentication could not start.',
+            message: 'Please refresh the page and try again.',
+            icon: Icons.error_outline_rounded,
+            iconColor: Colors.red,
+          );
+        }
+
+        final user = snapshot.data;
+        if (user == null) {
+          return const LoginScreen(adminOnly: true);
+        }
+
+        return _AdminRoleGate(user: user);
+      },
+    );
+  }
+}
+
+class _AdminRoleGate extends StatelessWidget {
+  const _AdminRoleGate({required this.user});
+
+  final User user;
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+
+    return FutureBuilder<bool>(
+      future: authService.isAdmin(user.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _StatusScaffold(
+            title: 'Checking admin permissions...',
+            child: CircularProgressIndicator(color: FastBrand.primary),
+          );
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Error checking admin status: ${snapshot.error}');
+          return const _StatusScaffold(
+            title: 'Admin permissions could not be verified.',
+            message: 'Please sign out and try again.',
+            icon: Icons.error_outline_rounded,
+            iconColor: Colors.red,
+          );
+        }
+
+        final isAdmin = snapshot.data ?? false;
+        if (!isAdmin) {
+          return const _AdminAccessDeniedScreen();
+        }
+
+        return const AdminDashboardScreen();
+      },
+    );
+  }
+}
+
+class _AdminAccessDeniedScreen extends StatelessWidget {
+  const _AdminAccessDeniedScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return _AdminMessageScaffold(
+      icon: Icons.lock_outline_rounded,
+      iconColor: FastBrand.danger,
+      title: 'Admin access denied.',
+      message:
+          'This signed-in account is not marked as an admin. Use an approved admin account to continue.',
+      primaryAction: ElevatedButton.icon(
+        onPressed: () async {
+          await Provider.of<AuthService>(context, listen: false).signOut();
+          if (!context.mounted) {
+            return;
+          }
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil('/admin', (route) => false);
+        },
+        icon: const Icon(Icons.logout_rounded),
+        label: const Text('Sign Out'),
+      ),
+      secondaryAction: TextButton(
+        onPressed: () {
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        },
+        child: const Text('Return to public app'),
+      ),
+    );
+  }
+}
+
+class _WebOnlyAdminScreen extends StatelessWidget {
+  const _WebOnlyAdminScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return _AdminMessageScaffold(
+      icon: Icons.language_rounded,
+      iconColor: FastBrand.primary,
+      title: 'Admin is web-only.',
+      message:
+          'Open https://fast-must-orientation.web.app/admin in a browser to manage FAST content.',
+      primaryAction: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        },
+        icon: const Icon(Icons.home_rounded),
+        label: const Text('Return to app'),
+      ),
+    );
+  }
+}
+
+class _AdminMessageScaffold extends StatelessWidget {
+  const _AdminMessageScaffold({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.message,
+    required this.primaryAction,
+    this.secondaryAction,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String message;
+  final Widget primaryAction;
+  final Widget? secondaryAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: FastBrand.shellBackground,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxWidth: 440),
+              padding: const EdgeInsets.all(28),
+              decoration: FastBrand.surfaceDecoration(radius: 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 58, color: iconColor),
+                  const SizedBox(height: 18),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: FastBrand.headingText,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: FastBrand.mutedText,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  primaryAction,
+                  if (secondaryAction != null) ...[
+                    const SizedBox(height: 10),
+                    secondaryAction!,
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

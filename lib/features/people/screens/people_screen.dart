@@ -122,7 +122,8 @@ class _PeopleScreenState extends State<PeopleScreen> {
                     !keyContacts.any((contact) => contact.id == person.id),
               )
               .toList(growable: false);
-          final departmentFilters = _departmentFiltersFor(remainingStaff);
+          final departmentRoster = allPeople;
+          final departmentFilters = _departmentFiltersFor(departmentRoster);
           final effectiveSelectedDepartment =
               departmentFilters.any(
                     (department) => department.value == _selectedDepartment,
@@ -144,7 +145,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                   )
                   .shortLabel;
           final filteredStaff = _filterStaffByDepartment(
-            remainingStaff,
+            departmentRoster,
             effectiveSelectedDepartment,
           );
 
@@ -171,14 +172,14 @@ class _PeopleScreenState extends State<PeopleScreen> {
                         _selectedFilter == 'staff' &&
                                 effectiveSelectedDepartment !=
                                     _allDepartmentsValue
-                            ? '$selectedDepartmentShortLabel Staff'
+                            ? '$selectedDepartmentShortLabel People'
                             : _filterHeading(_selectedFilter),
                     subtitle:
                         _selectedFilter == 'staff'
                             ? effectiveSelectedDepartment ==
                                     _allDepartmentsValue
-                                ? 'Browse staff across FAST or narrow the list by department.'
-                                : 'Staff profiles published under $selectedDepartmentLabel.'
+                                ? 'Browse people across FAST or narrow the list by department.'
+                                : 'People profiles published under $selectedDepartmentLabel.'
                             : 'People and contacts published for this view.',
                   ),
                   if (_selectedFilter == 'staff') ...[
@@ -266,7 +267,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  if (remainingStaff.isNotEmpty || allPeople.isNotEmpty) ...[
+                  if (remainingStaff.isNotEmpty) ...[
                     const _SectionTitle(
                       title: 'Directory',
                       subtitle: 'The wider FAST people directory.',
@@ -671,7 +672,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
     if (person.isDean) {
       return 4;
     }
-    if (person.isLeadership) {
+    if (person.isLeadership || person.isHod) {
       return 3;
     }
     if (person.isKeyContact) {
@@ -1059,10 +1060,31 @@ class _PersonCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: FastBrand.primary,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (person.hasEmail)
+                    IconButton.filledTonal(
+                      onPressed:
+                          () => launchUrl(
+                            Uri(scheme: 'mailto', path: person.email!),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                      tooltip: 'Email ${person.displayName}',
+                      style: IconButton.styleFrom(
+                        backgroundColor: FastBrand.primary.withValues(
+                          alpha: 0.08,
+                        ),
+                        foregroundColor: FastBrand.primary,
+                      ),
+                      icon: const Icon(Icons.email_outlined, size: 18),
+                    ),
+                  const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: FastBrand.primary,
+                  ),
+                ],
               ),
             ],
           ),

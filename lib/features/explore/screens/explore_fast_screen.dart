@@ -168,6 +168,7 @@ class _ExploreFastScreenState extends State<ExploreFastScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(child: _buildHero(data)),
+                SliverToBoxAdapter(child: _buildExplorePathways()),
                 SliverToBoxAdapter(
                   child: _buildDepartmentsSection(data.departments),
                 ),
@@ -342,9 +343,92 @@ class _ExploreFastScreenState extends State<ExploreFastScreen> {
     );
   }
 
+  Widget _buildExplorePathways() {
+    const pathways = [
+      _ExplorePathway(
+        icon: Icons.account_balance_rounded,
+        label: 'Departments',
+        description: 'Academic homes across FAST.',
+        color: FastBrand.primary,
+      ),
+      _ExplorePathway(
+        icon: Icons.school_rounded,
+        label: 'Programmes',
+        description: 'Degree and study pathways.',
+        color: FastBrand.secondary,
+      ),
+      _ExplorePathway(
+        icon: Icons.science_rounded,
+        label: 'Research',
+        description: 'Faculty research activity.',
+        color: Color(0xFF5B5FC7),
+      ),
+      _ExplorePathway(
+        icon: Icons.lightbulb_rounded,
+        label: 'Innovation',
+        description: 'Ideas, prototypes, and impact.',
+        color: FastBrand.warning,
+      ),
+      _ExplorePathway(
+        icon: Icons.biotech_rounded,
+        label: 'Laboratories',
+        description: 'Labs, facilities, and spaces.',
+        color: FastBrand.primaryStrong,
+      ),
+      _ExplorePathway(
+        icon: Icons.engineering_rounded,
+        label: 'Student Projects',
+        description: 'Applied student work.',
+        color: FastBrand.secondary,
+      ),
+      _ExplorePathway(
+        icon: Icons.photo_library_rounded,
+        label: 'Gallery',
+        description: 'FAST images and stories.',
+        color: FastBrand.primary,
+      ),
+      _ExplorePathway(
+        icon: Icons.handshake_rounded,
+        label: 'Partnerships',
+        description: 'Industry and community links.',
+        color: FastBrand.warning,
+      ),
+    ];
+
+    return _SectionCard(
+      title: 'Explore Pathways',
+      subtitle:
+          'A quick map of the academic, research, innovation, and community areas that make FAST discoverable.',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns =
+              constraints.maxWidth >= 760
+                  ? 4
+                  : constraints.maxWidth >= 480
+                  ? 3
+                  : 2;
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: pathways.length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              mainAxisExtent: 142,
+            ),
+            itemBuilder:
+                (context, index) =>
+                    _ExplorePathwayTile(pathway: pathways[index]),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildProgramsSection(List<_ProgramExplorerItem> programs) {
     return _SectionCard(
-      title: 'Programs',
+      title: 'Programmes',
       subtitle:
           'See the degrees and study paths currently available across FAST.',
       child:
@@ -382,7 +466,7 @@ class _ExploreFastScreenState extends State<ExploreFastScreen> {
 
   Widget _buildLabsAndFacilitiesSection(List<_FacilityItem> facilityItems) {
     return _SectionCard(
-      title: 'Labs and Facilities',
+      title: 'Laboratories and Facilities',
       subtitle:
           'Showcase the spaces, labs, studios, and facilities students use across FAST.',
       child:
@@ -711,6 +795,71 @@ class _SectionCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+class _ExplorePathway {
+  const _ExplorePathway({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+}
+
+class _ExplorePathwayTile extends StatelessWidget {
+  const _ExplorePathwayTile({required this.pathway});
+
+  final _ExplorePathway pathway;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: pathway.color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: pathway.color.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: FastBrand.tintDecoration(pathway.color, radius: 14),
+            child: Icon(pathway.icon, color: pathway.color),
+          ),
+          const Spacer(),
+          Text(
+            pathway.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: FastBrand.headingText,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            pathway.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: FastBrand.mutedText,
+              fontSize: 12,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

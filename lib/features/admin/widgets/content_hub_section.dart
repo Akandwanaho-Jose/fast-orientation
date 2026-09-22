@@ -3,6 +3,7 @@ import 'package:fast/core/models/quick_link.dart';
 import 'package:fast/core/services/quick_links_service.dart';
 import 'package:fast/core/utils/constants.dart';
 import 'package:fast/features/admin/widgets/admin_shared.dart';
+import 'package:fast/features/orientation/models/orientation_step_content.dart';
 import 'package:flutter/material.dart';
 
 class ContentHubSection extends StatefulWidget {
@@ -18,6 +19,7 @@ class _ContentHubSectionState extends State<ContentHubSection> {
   static const _tabs = <_ContentHubTab>[
     _ContentHubTab('Stories', _StoriesTab()),
     _ContentHubTab('Orientation', _OrientationTab()),
+    _ContentHubTab('Steps', _OrientationStepsTab()),
     _ContentHubTab('Labs', _LabsTab()),
     _ContentHubTab('Support', _SupportTab()),
     _ContentHubTab('Quick Links', _QuickLinksTab()),
@@ -700,6 +702,310 @@ class _OrientationTab extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _OrientationStepsTab extends StatelessWidget {
+  const _OrientationStepsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final collection = FirebaseFirestore.instance.collection(
+      'orientation_steps',
+    );
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: collection.orderBy('order').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const AdminLoadingState();
+        }
+        if (snapshot.hasError) {
+          return const AdminErrorState(
+            message: 'Orientation steps could not load.',
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? const [];
+        return _ContentListFrame(
+          title: 'Orientation Steps',
+          onAdd: () => _showStepDialog(context),
+          child:
+              docs.isEmpty
+                  ? _EmptyStepsState(onSeed: () => _seedDefaultSteps(context))
+                  : ListView.separated(
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final doc = docs[index];
+                      final step = OrientationStepContent.fromMap(
+                        doc.id,
+                        doc.data(),
+                      );
+                      return _ContentCard(
+                        title: step.title,
+                        subtitle:
+                            step.summary.isNotEmpty
+                                ? step.summary
+                                : step.content,
+                        imageUrl: null,
+                        tags: [
+                          _iconLabel(step.iconKey),
+                          step.status,
+                          'order ${step.order}',
+                        ],
+                        onEdit:
+                            () => _showStepDialog(
+                              context,
+                              id: doc.id,
+                              data: doc.data(),
+                            ),
+                        onDelete: () => _deleteDoc(context, collection, doc.id),
+                      );
+                    },
+                  ),
+        );
+      },
+    );
+  }
+
+  Future<void> _seedDefaultSteps(BuildContext context) async {
+    final collection = FirebaseFirestore.instance.collection(
+      'orientation_steps',
+    );
+    final batch = FirebaseFirestore.instance.batch();
+    for (final step in OrientationStepContent.defaultSteps) {
+      batch.set(collection.doc(step.id), step.toFirestore());
+    }
+    await batch.commit();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Default orientation steps created.')),
+    );
+  }
+
+  Future<void> _showStepDialog(
+    BuildContext context, {
+    String? id,
+    Map<String, dynamic>? data,
+  }) async {
+    final existing =
+        data == null ? null : OrientationStepContent.fromMap(id!, data);
+    final titleController = TextEditingController(text: existing?.title ?? '');
+    final summaryController = TextEditingController(
+      text: existing?.summary ?? '',
+    );
+    final contentController = TextEditingController(
+      text: existing?.content ?? '',
+    );
+    final actionLabelController = TextEditingController(
+      text: existing?.actionLabel ?? '',
+    );
+    final actionUrlController = TextEditingController(
+      text: existing?.actionUrl ?? '',
+    );
+    final orderController = TextEditingController(
+      text: '${existing?.order ?? 1}',
+    );
+    var iconKey = existing?.iconKey ?? 'admission';
+    var status = existing?.status ?? 'published';
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: Text(id == null ? 'Create Step' : 'Edit Step'),
+              content: SizedBox(
+                width: 720,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _textField(titleController, 'Step title'),
+                      DropdownButtonFormField<String>(
+                        initialValue: iconKey,
+                        decoration: _decoration('Step icon'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'admission',
+                            child: Text('Admission'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'registration',
+                            child: Text('Registration'),
+                          ),
+                          DropdownMenuItem(value: 'fees', child: Text('Fees')),
+                          DropdownMenuItem(
+                            value: 'academic_calendar',
+                            child: Text('Academic Calendar'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'campus_services',
+                            child: Text('Campus Services'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'student_support',
+                            child: Text('Student Support'),
+                          ),
+                          DropdownMenuItem(value: 'faqs', child: Text('FAQs')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => iconKey = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _textField(
+                        summaryController,
+                        'Short summary',
+                        maxLines: 3,
+                        helper: 'Shown first when students expand this step.',
+                      ),
+                      _textField(
+                        contentController,
+                        'Full information',
+                        maxLines: 7,
+                      ),
+                      _textField(
+                        actionLabelController,
+                        'Action label',
+                        helper: 'Optional. Example: Open portal.',
+                      ),
+                      _textField(actionUrlController, 'Action URL'),
+                      _textField(
+                        orderController,
+                        'Display order',
+                        keyboardType: TextInputType.number,
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: status,
+                        decoration: _decoration('Status'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'published',
+                            child: Text('Published'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'draft',
+                            child: Text('Draft'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => status = value);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final title = titleController.text.trim();
+                    if (title.isEmpty) return;
+
+                    final collection = FirebaseFirestore.instance.collection(
+                      'orientation_steps',
+                    );
+                    final doc =
+                        id == null
+                            ? collection.doc(slugify(title))
+                            : collection.doc(id);
+                    final actionLabel = actionLabelController.text.trim();
+                    final actionUrl = actionUrlController.text.trim();
+                    await doc.set({
+                      'title': title,
+                      'summary': summaryController.text.trim(),
+                      'content': contentController.text.trim(),
+                      'iconKey': iconKey,
+                      'actionLabel':
+                          actionLabel.isEmpty
+                              ? FieldValue.delete()
+                              : actionLabel,
+                      'actionUrl':
+                          actionUrl.isEmpty ? FieldValue.delete() : actionUrl,
+                      'order': int.tryParse(orderController.text.trim()) ?? 1,
+                      'status': status,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                      if (id == null) 'createdAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: mustBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _iconLabel(String iconKey) {
+    switch (iconKey) {
+      case 'admission':
+        return 'admission';
+      case 'registration':
+        return 'registration';
+      case 'fees':
+        return 'fees';
+      case 'academic_calendar':
+        return 'calendar';
+      case 'campus_services':
+        return 'services';
+      case 'student_support':
+        return 'support';
+      case 'faqs':
+        return 'faqs';
+      default:
+        return iconKey;
+    }
+  }
+}
+
+class _EmptyStepsState extends StatelessWidget {
+  const _EmptyStepsState({required this.onSeed});
+
+  final VoidCallback onSeed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const AdminEmptyState(
+          icon: Icons.checklist_rounded,
+          title: 'No orientation steps yet',
+          message:
+              'Create the step cards students open for admission, registration, fees, support, and FAQs.',
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: onSeed,
+          icon: const Icon(Icons.auto_fix_high_rounded),
+          label: const Text('Create default steps'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: mustBlue,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
     );
   }
 }

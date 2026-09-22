@@ -1,0 +1,91 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isPublishedAnnouncement(updateId) {
+      return exists(/databases/$(database)/documents/announcements/$(updateId))
+        && get(/databases/$(database)/documents/announcements/$(updateId)).data.status == 'published';
+    }
+
+    function validLikeCount() {
+      return request.resource.data.likeCount is int
+        && request.resource.data.likeCount >= 0
+        && (
+          (!('likeCount' in resource.data) && request.resource.data.likeCount == 1)
+          || (
+            ('likeCount' in resource.data)
+            && resource.data.likeCount is int
+            && (
+              request.resource.data.likeCount == resource.data.likeCount + 1
+              || request.resource.data.likeCount == resource.data.likeCount - 1
+            )
+          )
+        );
+    }
+
+    function validCommentCount() {
+      return request.resource.data.commentCount is int
+        && request.resource.data.commentCount >= 0
+        && (
+          (!('commentCount' in resource.data) && request.resource.data.commentCount == 1)
+          || (
+            ('commentCount' in resource.data)
+            && resource.data.commentCount is int
+            && request.resource.data.commentCount == resource.data.commentCount + 1
+          )
+        );
+    }
+
+    function validPublicEngagementUpdate() {
+      return request.resource.data.lastEngagedAt == request.time
+        && (
+          (changedKeys().hasOnly(['likeCount', 'lastEngagedAt']) && validLikeCount())
+          || (changedKeys().hasOnly(['commentCount', 'lastEngagedAt']) && validCommentCount())
+        );
+    }
+
+    function validPublicComment(updateId) {
+      return isPublishedAnnouncement(updateId)
+        && request.resource.data.keys().hasOnly(['text', 'name', 'timestamp', 'updateId'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 800
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.updateId == updateId
+        && request.resource.data.timestamp == request.time;
+    }
+
+    match /announcements/{updateId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || validPublicEngagementUpdate();
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if validPublicComment(updateId);
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

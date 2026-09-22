@@ -94,6 +94,9 @@ class Staff {
   bool get hasEmail => email?.isNotEmpty == true;
   bool get hasPhone => phone?.isNotEmpty == true;
   bool get hasBio => bio?.isNotEmpty == true;
+  bool get hasDepartment =>
+      departmentName?.trim().isNotEmpty == true ||
+      department?.trim().isNotEmpty == true;
   bool get isPublished => status == 'published';
   bool get isDean => roleType == 'dean';
   bool get isHod => roleType == 'hod';

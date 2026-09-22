@@ -4,26 +4,28 @@ import 'package:fast/models/user.dart';
 import 'package:fast/features/auth/screens/register_screen.dart';
 import 'package:fast/features/home/screens/home_screen.dart';
 import 'package:fast/core/utils/constants.dart';
-import 'package:fast/features/admin/screens/admin_dashboard_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:fast/core/services/forgot_password_dialog.dart'; // Adjust path as needed
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.adminOnly = false});
+
+  final bool adminOnly;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with TickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
-  
+
   late AnimationController _animationController;
   late AnimationController _logoController;
   late Animation<double> _fadeAnimation;
@@ -41,35 +43,32 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     _logoController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.5),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.2, 0.8, curve: Curves.easeOutCubic),
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.2, 0.8, curve: Curves.easeOutCubic),
+      ),
+    );
 
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _logoController,
-      curve: Curves.elasticOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
+    );
 
     _animationController.forward();
     _logoController.forward();
@@ -81,28 +80,36 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         _isLoading = true;
         _errorMessage = null;
       });
-      
+
       try {
         final authService = Provider.of<AuthService>(context, listen: false);
         AppUser? user = await authService.signIn(
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
-        
+
         if (user != null) {
-          print('LoginScreen: User signed in, userId: ${user.uid}');
+          debugPrint('LoginScreen: User signed in, userId: ${user.uid}');
           final isAdmin = await authService.isAdmin(user.uid);
-          print('LoginScreen: isAdmin result: $isAdmin');
-          
+          debugPrint('LoginScreen: isAdmin result: $isAdmin');
+
           if (isAdmin) {
-            print('LoginScreen: User is admin, navigating to AdminDashboardScreen');
-            Navigator.pushAndRemoveUntil(
+            debugPrint('LoginScreen: User is admin, navigating to admin route');
+            if (!mounted) return;
+            Navigator.of(
               context,
-              MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-              (route) => false,
-            );
+            ).pushNamedAndRemoveUntil('/admin', (route) => false);
+          } else if (widget.adminOnly) {
+            await authService.signOut();
+            if (!mounted) return;
+            setState(() {
+              _errorMessage = 'This account does not have admin access.';
+            });
           } else {
-            print('LoginScreen: User is not admin, navigating to HomeScreen');
+            debugPrint(
+              'LoginScreen: User is not admin, navigating to HomeScreen',
+            );
+            if (!mounted) return;
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -111,11 +118,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           }
         }
       } catch (e) {
+        if (!mounted) return;
         setState(() {
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       } finally {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
@@ -139,9 +149,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             end: Alignment.bottomRight,
             stops: const [0.0, 0.4, 0.7, 1.0],
             colors: [
-              mustBlue.withOpacity(0.1),
-              mustGreen.withOpacity(0.05),
-              Colors.white.withOpacity(0.9),
+              mustBlue.withValues(alpha: 0.1),
+              mustGreen.withValues(alpha: 0.05),
+              Colors.white.withValues(alpha: 0.9),
               Colors.white,
             ],
           ),
@@ -160,8 +170,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                       _buildLogo(),
                       const SizedBox(height: 48),
                       _buildLoginForm(),
-                      const SizedBox(height: 32),
-                      _buildRegisterSection(),
+                      if (!widget.adminOnly) ...[
+                        const SizedBox(height: 32),
+                        _buildRegisterSection(),
+                      ],
                     ],
                   ),
                 ),
@@ -176,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Widget _buildLogoContent() {
     // Option 1: If you have a MUST logo image file
     // Uncomment this section and replace 'assets/images/must_logo.png' with your actual logo path
-    
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(30),
       child: Image.asset(
@@ -186,9 +198,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         fit: BoxFit.cover,
       ),
     );
-    
-
-    
   }
 
   Widget _buildLogo() {
@@ -209,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: mustBlue.withOpacity(0.3),
+                  color: mustBlue.withValues(alpha: 0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -220,11 +229,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           const SizedBox(height: 24),
           // App Name
           ShaderMask(
-            shaderCallback: (bounds) => LinearGradient(
-              colors: [mustBlue, mustGreen],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ).createShader(bounds),
+            shaderCallback:
+                (bounds) => LinearGradient(
+                  colors: [mustBlue, mustGreen],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ).createShader(bounds),
             child: const Text(
               'FAST connect',
               style: TextStyle(
@@ -237,7 +247,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           ),
           const SizedBox(height: 8),
           Text(
-            'Welcome back! Please sign in to continue',
+            widget.adminOnly
+                ? 'Admin dashboard access'
+                : 'Welcome back! Please sign in to continue',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
@@ -257,7 +269,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -279,14 +291,16 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
-                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                if (!RegExp(
+                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                ).hasMatch(value)) {
                   return 'Please enter a valid email';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 20),
-            
+
             // Password Field
             _buildCustomTextField(
               controller: _passwordController,
@@ -316,31 +330,31 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               },
             ),
             const SizedBox(height: 16),
-            
+
             // Forgot Password
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
-  onPressed: () {
-    showDialog(
-      context: context,
-      builder: (context) => const ForgotPasswordDialog(),
-    );
-  },
-  child: Text(
-    'Forgot Password?',
-    style: TextStyle(
-      color: mustBlue,
-      fontWeight: FontWeight.w600,
-    ),
-  ),
-),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const ForgotPasswordDialog(),
+                  );
+                },
+                child: Text(
+                  'Forgot Password?',
+                  style: TextStyle(
+                    color: mustBlue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 24),
-            
+
             // Login Button
             _buildLoginButton(),
-            
+
             // Error Message
             if (_errorMessage != null) ...[
               const SizedBox(height: 16),
@@ -402,7 +416,10 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               borderRadius: BorderRadius.circular(16),
               borderSide: const BorderSide(color: Colors.red, width: 2),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
           style: const TextStyle(fontSize: 16),
         ),
@@ -422,7 +439,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: mustBlue.withOpacity(0.3),
+            color: mustBlue.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -437,23 +454,24 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             borderRadius: BorderRadius.circular(16),
           ),
         ),
-        child: _isLoading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        child:
+            _isLoading
+                ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                : const Text(
+                  'Sign In',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              )
-            : const Text(
-                'Sign In',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
       ),
     );
   }
@@ -489,9 +507,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
+        color: Colors.white.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [

@@ -1,12 +1,14 @@
 name: fast
 description: "FAST - Faculty of Applied Sciences & Technology App"
 publish_to: 'none'
-version: 1.0.3+4
+version: 1.1.0+110
 environment:
   sdk: '>=3.7.2 <4.0.0'
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_web_plugins:
     sdk: flutter
   
   # UI & Icons
@@ -42,6 +44,7 @@ dependencies:
   
   # Utilities
   logging: ^1.2.0
+  web: ^1.1.1
   
   # Additional Production Recommendations
   connectivity_plus: ^5.0.2  # Network connectivity monitoring

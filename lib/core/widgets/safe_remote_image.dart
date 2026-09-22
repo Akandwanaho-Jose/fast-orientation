@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
@@ -92,18 +93,13 @@ class SafeRemoteImage extends StatelessWidget {
   }
 
   Widget _buildNetworkImage(String url) {
-    return Image.network(
-      url,
+    return CachedNetworkImage(
+      imageUrl: url,
       fit: fit,
       alignment: alignment,
       filterQuality: filterQuality,
-      errorBuilder: (_, __, ___) => _buildFallback(),
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) {
-          return child;
-        }
-        return _buildFallback();
-      },
+      placeholder: (_, __) => _buildFallback(),
+      errorWidget: (_, __, ___) => _buildFallback(),
     );
   }
 
